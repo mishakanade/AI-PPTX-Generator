@@ -10,7 +10,7 @@ Its a BYOK (Bring Your Own Key) application. To get your api keys, go to those w
 
 To run the project, follow this steps:
   1. Git clone the project into a directory
-  2. CD the directory
-  3. Download all the needed libraries (stated in requirements.txt)
-  4. In your .env file, put your API keys you got in the variables "GEMINI_API_KEY" and "UNSPLASH_CLIENT_ID"
+  2. Download all the needed libraries (stated in requirements.txt)
+  3. In your .env file, put your API keys you got in the variables "GEMINI_API_KEY" and "UNSPLASH_CLIENT_ID"
+  4. CD the directory (Find where the project is saved, then run with your directory this in the terminal (example): "cd C:\Users\Your Username\Documents\MyProject")
   5. Run this in the terminal : "python -m streamlit run app.py"

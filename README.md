@@ -4,6 +4,8 @@ Works on this APIs: google-genai, Unsplash API
 
 This version is only in Alpha - the project will keep improving with time, as this is built in solo.
 
+The UI might be a little crooked and unappealing, this will be fixed in the next versions.
+
 Its a BYOK (Bring Your Own Key) application. To get your api keys, go to those websites : 
 - https://unsplash.com/developers
 - https://aistudio.google.com/api-keys

@@ -1,6 +1,7 @@
 """Streamlit interface. All generation logic lives in the generator/ package."""
 import streamlit as st
 
+from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.llm import generate_structure_with_retry, parse_slides_json
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
@@ -42,6 +43,21 @@ def render_theme_preview(theme_colors):
 st.set_page_config(page_title="AI PPTX Generator Pro", page_icon="📊", layout="wide")
 st.title("📊 AI PPTX Generator Pro")
 st.caption("Presentation generator with auto-design and illustration selection from Unsplash")
+
+if not config.GEMINI_API_KEY:
+    st.error(
+        "🔑 Gemini API key not found.\n\n"
+        "1. Get a key at https://aistudio.google.com/api-keys\n"
+        "2. Copy `.env.example` to `.env` in the project folder\n"
+        "3. Put the key into `GEMINI_API_KEY` and restart the app"
+    )
+    st.stop()  # nothing below can work without the key, so stop drawing the page here
+
+if not config.UNSPLASH_CLIENT_ID:
+    st.info(
+        "🖼️ Unsplash key not found, so presentations will be generated without images. "
+        "To add them, put a key from https://unsplash.com/developers into `UNSPLASH_CLIENT_ID` in `.env`."
+    )
 
 
 col_main, col_settings = st.columns([2, 1], gap="medium")

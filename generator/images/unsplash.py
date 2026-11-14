@@ -9,6 +9,8 @@ from generator import config
 
 def fetch_image_bytes(keyword: str):
     """Load an image from Unsplash by keyword"""
+    if not config.UNSPLASH_CLIENT_ID:
+        return None  # no key: skip the request instead of waiting for it to be rejected
     clean_keyword = urllib.parse.quote(keyword.strip())
     api_url = f"https://api.unsplash.com/search/photos?query={clean_keyword}&per_page=1&orientation=landscape&client_id={config.UNSPLASH_CLIENT_ID}"
     try:

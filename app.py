@@ -7,7 +7,8 @@ from generator.content.llm import generate_structure_with_retry, parse_slides_js
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
 from generator.design.themes import THEMES
-from generator.render.pptx_builder import create_pptx_in_memory
+from generator.images.unsplash import fetch_images_for_slides
+from generator.render.pptx_builder import build_pptx
 
 
 def render_theme_preview(theme_colors):
@@ -115,25 +116,45 @@ if submit_button:
             num_slides=num_slides,
         )
 
-        for key in ("pptx_bytes", "slides_data", "file_name"):
+        # Forget the previous presentation before making a new one
+        for key in ("slides_data", "images", "file_name", "pptx_bytes", "rendered_theme"):
             st.session_state.pop(key, None)
 
         with st.spinner("⏳ Gemini is creating the content and downloading images from Unsplash..."):
             try:
                 raw_text = generate_structure_with_retry(prompt)
                 slides_data = parse_slides_json(raw_text)
-                pptx_file = create_pptx_in_memory(slides_data, selected_theme)
-                st.session_state["pptx_bytes"] = pptx_file.getvalue()
+                # The content and its pictures are kept for the whole session;
+                # the .pptx itself is built from them in the block below.
+                st.session_state["images"] = fetch_images_for_slides(slides_data)
                 st.session_state["slides_data"] = slides_data
                 st.session_state["file_name"] = f"{topic if topic else 'presentation'}.pptx"
             except Exception as e:
                 st.error(f"❌ An error occurred: {e}")
 
 
+# Streamlit reruns this whole script on every interaction. Whenever there is content and
+# the file was not built for the currently selected theme (a new generation, or the user
+# picked another theme), build it again. No Gemini or Unsplash calls happen here.
+if "slides_data" in st.session_state and st.session_state.get("rendered_theme") != selected_theme:
+    try:
+        st.session_state["pptx_bytes"] = build_pptx(
+            st.session_state["slides_data"], selected_theme, st.session_state["images"]
+        )
+        st.session_state["rendered_theme"] = selected_theme
+    except Exception as e:
+        st.session_state.pop("pptx_bytes", None)
+        st.error(f"❌ Could not build the presentation: {e}")
+
+
 with col_main:
     if "pptx_bytes" in st.session_state:
         slides_data = st.session_state["slides_data"]
         st.success(f"✅ Presentation with {len(slides_data.get('slides', []))} slides is ready!")
+        st.caption(
+            f"Theme: {st.session_state['rendered_theme']}. Pick another design theme "
+            "to rebuild the file instantly with the same content."
+        )
         st.download_button(
             label="📥 Download the finished .pptx file",
             data=st.session_state["pptx_bytes"],

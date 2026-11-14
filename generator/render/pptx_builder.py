@@ -1,4 +1,8 @@
-"""Turns the slide structure (a dict from Gemini) into a .pptx file."""
+"""Turns the slide structure (a dict from Gemini) into a .pptx file.
+
+This module does no network or API calls: everything it needs is passed in,
+so the same content can be rebuilt in another theme instantly.
+"""
 from io import BytesIO
 
 from pptx import Presentation
@@ -6,11 +10,15 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 from generator.design.themes import DEFAULT_THEME, THEMES
-from generator.images.unsplash import fetch_image_bytes
 
 
-def create_pptx_in_memory(slides_data, theme_name):
-    """Build the PPTX presentation in memory (BytesIO)"""
+def build_pptx(slides_data, theme_name, images):
+    """Build the presentation and return the .pptx file as bytes.
+
+    slides_data - {"title", "subtitle", "slides": [{"title", "content", "image_keyword"}, ...]}
+    theme_name  - a key of THEMES
+    images      - {image_keyword: image bytes}, see images.unsplash.fetch_images_for_slides
+    """
     prs = Presentation()
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
@@ -60,15 +68,13 @@ def create_pptx_in_memory(slides_data, theme_name):
             p.font.color.rgb = colors["text"]
             p.space_after = Pt(14)
         img_keyword = slide_info.get("image_keyword")
-        if img_keyword:
-            img_bytes = fetch_image_bytes(img_keyword)
-            if img_bytes:
-                try:
-                    slide.shapes.add_picture(img_bytes, Inches(7.8), Inches(1.8), width=Inches(4.8))
-                except Exception:
-                    pass
+        img_bytes = images.get(img_keyword) if isinstance(img_keyword, str) else None
+        if img_bytes:
+            try:
+                slide.shapes.add_picture(BytesIO(img_bytes), Inches(7.8), Inches(1.8), width=Inches(4.8))
+            except Exception:
+                pass
 
     output = BytesIO()
     prs.save(output)
-    output.seek(0)
-    return output
+    return output.getvalue()

@@ -1,7 +1,7 @@
 """Streamlit interface. All generation logic lives in the generator/ package."""
 import streamlit as st
 
-from generator.content.documents import extract_text_from_file
+from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.llm import generate_structure_with_retry, parse_slides_json
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import build_prompt
@@ -76,7 +76,12 @@ with col_settings:
 
 
 if submit_button:
-    doc_text = extract_text_from_file(uploaded_file)
+    doc_text = ""
+    try:
+        doc_text = extract_text_from_file(uploaded_file)
+    except DocumentReadError as e:
+        st.warning(f"⚠️ {e} The document was ignored.")
+
     if not topic.strip() and not doc_text.strip():
         st.warning("⚠️ Please enter a topic or upload a document!")
     else:

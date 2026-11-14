@@ -10,9 +10,32 @@ Its a BYOK (Bring Your Own Key) application. To get your api keys, go to those w
 - https://unsplash.com/developers
 - https://aistudio.google.com/api-keys
 
-To run the project, follow this steps:
+To run the project, follow these steps:
   1. Git clone the project into a directory
-  2. Download all the needed libraries (stated in requirements.txt)
-  3. In your .env file, put your API keys you got in the variables "GEMINI_API_KEY" and "UNSPLASH_CLIENT_ID"
-  4. CD the directory (Find where the project is saved, then run with your directory this in the terminal (example): "cd C:\Users\Your Username\Documents\MyProject")
-  5. Run this in the terminal : "python -m streamlit run app.py"
+  2. CD into that directory (example): `cd C:\Users\Your Username\Documents\MyProject`
+  3. Install the libraries: `pip install -r requirements.txt`
+  4. Copy `.env.example` to a new file named `.env` and put your API keys into the variables "GEMINI_API_KEY" and "UNSPLASH_CLIENT_ID" (the Unsplash key is optional: without it presentations are generated without images)
+  5. Run this in the terminal: `python -m streamlit run app.py`
+
+Supported documents: TXT, PDF and DOCX. After a presentation is generated you can switch the design theme, and the file is rebuilt with the same content without a new request to Gemini.
+
+## Project structure
+
+```
+app.py                      Streamlit interface: the form, messages, download button
+generator/
+  config.py                 API keys and model names
+  content/
+    presets.py              tone and text-amount presets
+    prompt.py               builds the request text for Gemini
+    llm.py                  sends the request, retries on failures, parses the answer
+    documents.py            reads text from TXT / PDF / DOCX
+  design/
+    themes.py               colour palettes
+  images/
+    unsplash.py             finds and downloads pictures
+  render/
+    pptx_builder.py         turns the content + theme + pictures into a .pptx file
+```
+
+How a presentation is made: `app.py` collects the form → `prompt.py` builds the request → `llm.py` gets the slide structure from Gemini as JSON → `unsplash.py` downloads a picture for each slide → `pptx_builder.py` builds the file.

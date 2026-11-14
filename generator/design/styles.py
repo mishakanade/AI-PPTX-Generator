@@ -93,7 +93,7 @@ class Style:
 class Minimal(Style):
     key = "minimal"
     name = "Minimal"
-    description = "Lots of air, thin lines, calm typography"
+    description = "Airy, thin lines, calm type"
     heading_bold = False
     table_header = "line"
     cover_title_size = 54
@@ -135,7 +135,7 @@ class Minimal(Style):
 class Editorial(Style):
     key = "editorial"
     name = "Editorial"
-    description = "Magazine look: serif headlines, rules, photos to the edge"
+    description = "Serif headlines, edge-to-edge photos"
     heading_font = "Georgia"
     bullet_char = "–"
     image_bleed = True
@@ -190,7 +190,7 @@ class Editorial(Style):
 class Corporate(Style):
     key = "corporate"
     name = "Corporate"
-    description = "Header band, solid colour blocks, strict grid"
+    description = "Header band, solid colour blocks"
     heading_font = "Arial"
     body_font = "Arial"
     body_size = 18
@@ -255,7 +255,7 @@ class Corporate(Style):
 class Soft(Style):
     key = "soft"
     name = "Soft"
-    description = "Rounded cards, soft shadows, friendly shapes"
+    description = "Rounded cards, soft shadows"
     image_radius = 0.3
     cover_title_size = 48
 
@@ -318,7 +318,7 @@ class Soft(Style):
 class Bold(Style):
     key = "bold"
     name = "Bold"
-    description = "Gradients, heavy headlines, large numbers"
+    description = "Gradients, heavy headlines"
     heading_font = "Arial"
     image_bleed = True
     stats_emphasis = True

@@ -14,16 +14,20 @@ from generator.render.layouts import build_specs
 from generator.render.pptx_backend import specs_to_pptx
 
 
-def build_slides(deck, style_key, theme_name, image_keys):
+def build_slides(deck, style_key, theme_name, image_keys, credits=None):
     """Describe every slide of the deck as a SlideSpec (what to draw and where)."""
     style = STYLES.get(style_key, STYLES[DEFAULT_STYLE])
     palette = make_palette(THEMES.get(theme_name, THEMES[DEFAULT_THEME]))
-    return build_specs(deck, style, palette, image_keys)
+    return build_specs(deck, style, palette, image_keys, credits)
 
 
-def build_pptx(deck, style_key, theme_name, images):
-    """Build the .pptx file and return it as bytes. images is {image_keyword: image bytes}."""
-    specs = build_slides(deck, style_key, theme_name, images.keys())
+def build_pptx(deck, style_key, theme_name, images, credits=None):
+    """Build the .pptx file and return it as bytes.
+
+    images is {image_keyword: image bytes}; credits is {image_keyword: author line}
+    and ends up in the speaker notes of the slides with those pictures.
+    """
+    specs = build_slides(deck, style_key, theme_name, images.keys(), credits)
     return specs_to_pptx(specs, images, title=deck.title)
 
 

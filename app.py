@@ -1,49 +1,79 @@
-"""Streamlit interface. All generation logic lives in the generator/ package."""
+"""Streamlit interface. All generation logic lives in the generator/ package.
+
+Streamlit reruns this whole file from top to bottom on every click. Everything that
+must survive between reruns (the generated presentation, the photos, the chosen style)
+is kept in st.session_state.
+"""
+import re
+
 import streamlit as st
 
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
-from generator.content.llm import generate_structure_with_retry, parse_slides_json
+from generator.content.llm import generate_deck
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
+from generator.design.colors import to_hex
+from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE, sample_photo_url
+from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import THEMES
-from generator.images.unsplash import fetch_images_for_slides
-from generator.render.pptx_builder import build_pptx
+from generator.images.unsplash import fetch_photos, keywords_for
+from generator.render.builder import build_pptx, build_preview
+
+PREVIEW_COLUMNS = 3
 
 
-def render_theme_preview(theme_colors):
-    """Show a small card painted in the theme's colours."""
-    bg_color = theme_colors['bg']
-    title_color = theme_colors['title']
-    accent_color = theme_colors['accent']
-    bg = f"rgb({bg_color[0]}, {bg_color[1]}, {bg_color[2]})"
-    title = f"rgb({title_color[0]}, {title_color[1]}, {title_color[2]})"
-    accent = f"rgb({accent_color[0]}, {accent_color[1]}, {accent_color[2]})"
-    st.markdown(
-        f"""
-        <div style="
-            background-color: {bg};
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 5px;
-        ">
-            <div style="color: {title}; font-weight: bold; font-size: 14px; margin-bottom: 4px;">
-                Slide Title
-            </div>
-            <div style="color: {accent}; font-size: 12px; font-weight: 600;">
-                — Subtitle / Accent
-            </div>
-            <div style="background-color: {accent}; height: 3px; width: 30px; border-radius: 2px; margin-top: 6px;"></div>
-        </div>
-        """,
-        unsafe_allow_html=True
+# ----- small helpers -----------------------------------------------------------------------
+
+def show_slide(slide_html):
+    """Show one slide preview with a thin frame around it."""
+    st.html(
+        '<div style="border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(128,128,128,0.35);">'
+        f"{slide_html}</div>"
     )
 
 
-st.set_page_config(page_title="AI PPTX Generator Pro", page_icon="📊", layout="wide")
-st.title("📊 AI PPTX Generator Pro")
-st.caption("Presentation generator with auto-design and illustration selection from Unsplash")
+def show_slides(slide_htmls):
+    """Show slide previews as a grid."""
+    columns = st.columns(PREVIEW_COLUMNS)
+    for i, slide_html in enumerate(slide_htmls):
+        with columns[i % PREVIEW_COLUMNS]:
+            show_slide(slide_html)
+
+
+@st.cache_data(show_spinner=False)
+def sample_preview(style_key, theme_name):
+    """The built-in example deck drawn in a style and theme. Cached: it never changes."""
+    return build_preview(SAMPLE_DECK, style_key, theme_name, {SAMPLE_IMAGE: sample_photo_url()})
+
+
+def show_swatches(theme):
+    """Four colour chips of the selected theme."""
+    chips = "".join(
+        f'<div title="{name}" style="flex:1;height:26px;background:{to_hex(tuple(theme[name]))};"></div>'
+        for name in ("bg", "title", "text", "accent")
+    )
+    st.html(
+        '<div style="display:flex;border-radius:6px;overflow:hidden;'
+        f'box-shadow:0 0 0 1px rgba(128,128,128,0.35);">{chips}</div>'
+    )
+
+
+def select_style(style_key):
+    st.session_state["style"] = style_key
+
+
+def safe_file_name(topic):
+    """A file name made from the topic, without characters that file systems reject."""
+    name = re.sub(r'[\\/:*?"<>|\r\n]+', " ", topic).strip()[:80].strip(" .")
+    return f"{name or 'presentation'}.pptx"
+
+
+# ----- page header and key checks -----------------------------------------------------------
+
+st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide")
+st.title("📊 AI PPTX Generator")
+st.caption("Describe a topic, pick a design, and get an editable PowerPoint presentation.")
 
 if not config.GEMINI_API_KEY:
     st.error(
@@ -56,41 +86,61 @@ if not config.GEMINI_API_KEY:
 
 if not config.UNSPLASH_CLIENT_ID:
     st.info(
-        "🖼️ Unsplash key not found, so presentations will be generated without images. "
+        "🖼️ Unsplash key not found, so presentations will be generated without photos. "
         "To add them, put a key from https://unsplash.com/developers into `UNSPLASH_CLIENT_ID` in `.env`."
     )
 
+st.session_state.setdefault("style", DEFAULT_STYLE)
 
-col_main, col_settings = st.columns([2, 1], gap="medium")
 
+# ----- sidebar: what the presentation is about -----------------------------------------------
 
-with col_settings:
-    st.markdown("### 🎨 Design Settings")
-    selected_theme = st.selectbox("Design theme:", list(THEMES.keys()))
-    st.caption("Theme preview:")
-    render_theme_preview(THEMES[selected_theme])
-
-    st.markdown("### 🎯 Presentation Content")
+with st.sidebar:
+    st.header("Content")
     with st.form("generation_form"):
-        topic = st.text_input("Presentation topic:", placeholder="For example: The History of Space Exploration")
-        uploaded_file = st.file_uploader(
-            "Attach a document (TXT, PDF, DOCX):",
-            type=["txt", "pdf", "docx"]
-        )
-        selected_tone = st.selectbox(
-            "Presentation style and tone:",
-            options=list(TONE_PRESETS.keys())
-        )
+        topic = st.text_input("Presentation topic", placeholder="The History of Space Exploration")
+        uploaded_file = st.file_uploader("Source document (optional)", type=["txt", "pdf", "docx"])
+        selected_tone = st.selectbox("Tone", options=list(TONE_PRESETS.keys()))
         selected_text_amount = st.selectbox(
-            "Text amount per slide:",
-            options=list(TEXT_AMOUNT_PRESETS.keys())
+            "Text amount per slide", options=list(TEXT_AMOUNT_PRESETS.keys()), index=2
         )
-        additional_commentary = st.text_input("Additional commentary (optional):", placeholder="For example: Focus on the environmental impact of Space exploration")
-        num_slides = st.slider("Number of slides:", min_value=2, max_value=10, value=4, step=1)
+        additional_commentary = st.text_input(
+            "Additional wishes (optional)", placeholder="Focus on the environmental impact"
+        )
+        num_slides = st.slider("Number of slides", min_value=2, max_value=15, value=6, step=1)
+        submit_button = st.form_submit_button("🚀 Generate presentation", type="primary", width="stretch")
+    st.caption("The design on the right can be changed at any time, even after generation.")
 
-        st.write("")
-        submit_button = st.form_submit_button("🚀 Generate Presentation", use_container_width=True)
 
+# ----- design: colours and style ------------------------------------------------------------
+
+st.subheader("Design")
+theme_column, _ = st.columns([1, 2])
+with theme_column:
+    selected_theme = st.selectbox("Colour theme", list(THEMES.keys()))
+    show_swatches(THEMES[selected_theme])
+
+st.markdown("**Style**")
+for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
+    with column, st.container(border=True):
+        # each card shows the real title slide of the example deck in this style and theme
+        show_slide(sample_preview(style_key, selected_theme)[0])
+        st.markdown(f"**{style.name}**")
+        st.caption(style.description)
+        is_selected = st.session_state["style"] == style_key
+        st.button(
+            "✓ Selected" if is_selected else "Select",
+            key=f"style_{style_key}",
+            type="primary" if is_selected else "secondary",
+            on_click=select_style, args=(style_key,),
+            width="stretch",
+        )
+selected_style = st.session_state["style"]
+
+st.divider()
+
+
+# ----- generation: runs once, when the form is submitted ------------------------------------
 
 if submit_button:
     doc_text = ""
@@ -117,50 +167,93 @@ if submit_button:
         )
 
         # Forget the previous presentation before making a new one
-        for key in ("slides_data", "images", "file_name", "pptx_bytes", "rendered_theme"):
+        for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design"):
             st.session_state.pop(key, None)
 
-        with st.spinner("⏳ Gemini is creating the content and downloading images from Unsplash..."):
+        with st.status("Writing the content with Gemini…", expanded=False) as status:
             try:
-                raw_text = generate_structure_with_retry(prompt)
-                slides_data = parse_slides_json(raw_text)
-                # The content and its pictures are kept for the whole session;
-                # the .pptx itself is built from them in the block below.
-                st.session_state["images"] = fetch_images_for_slides(slides_data)
-                st.session_state["slides_data"] = slides_data
-                st.session_state["file_name"] = f"{topic if topic else 'presentation'}.pptx"
+                deck = generate_deck(prompt, max_slides=num_slides)
+                status.update(label="Looking for photos on Unsplash…")
+                photos, photo_warnings = fetch_photos(keywords_for(deck))
+                # The content and its photos are kept for the whole session;
+                # the file itself is built from them in the block below.
+                st.session_state["deck"] = deck
+                st.session_state["photos"] = photos
+                st.session_state["photo_warnings"] = photo_warnings
+                st.session_state["file_name"] = safe_file_name(topic)
+                status.update(label="Content is ready", state="complete")
             except Exception as e:
+                status.update(label="Generation failed", state="error")
                 st.error(f"❌ An error occurred: {e}")
 
 
-# Streamlit reruns this whole script on every interaction. Whenever there is content and
-# the file was not built for the currently selected theme (a new generation, or the user
-# picked another theme), build it again. No Gemini or Unsplash calls happen here.
-if "slides_data" in st.session_state and st.session_state.get("rendered_theme") != selected_theme:
+# ----- rendering: runs whenever the content or the design changed ---------------------------
+
+# Whenever there is content and it was not drawn for the currently selected style and
+# theme (a new generation, or the user picked another design), draw it again.
+# No Gemini or Unsplash calls happen here, so switching designs is instant.
+design = (selected_style, selected_theme)
+if "deck" in st.session_state and st.session_state.get("rendered_design") != design:
+    deck, photos = st.session_state["deck"], st.session_state["photos"]
     try:
         st.session_state["pptx_bytes"] = build_pptx(
-            st.session_state["slides_data"], selected_theme, st.session_state["images"]
+            deck, selected_style, selected_theme,
+            images={key: photo.data for key, photo in photos.items()},
+            credits={key: photo.credit for key, photo in photos.items()},
         )
-        st.session_state["rendered_theme"] = selected_theme
+        st.session_state["preview"] = build_preview(
+            deck, selected_style, selected_theme,
+            {key: photo.preview_url for key, photo in photos.items()},
+        )
+        st.session_state["rendered_design"] = design
     except Exception as e:
         st.session_state.pop("pptx_bytes", None)
         st.error(f"❌ Could not build the presentation: {e}")
 
 
-with col_main:
-    if "pptx_bytes" in st.session_state:
-        slides_data = st.session_state["slides_data"]
-        st.success(f"✅ Presentation with {len(slides_data.get('slides', []))} slides is ready!")
+# ----- result -------------------------------------------------------------------------------
+
+if "pptx_bytes" in st.session_state:
+    deck, photos = st.session_state["deck"], st.session_state["photos"]
+    title_column, button_column = st.columns([2, 1], vertical_alignment="bottom")
+    with title_column:
+        st.subheader(deck.title)
         st.caption(
-            f"Theme: {st.session_state['rendered_theme']}. Pick another design theme "
-            "to rebuild the file instantly with the same content."
+            f"{len(deck.slides) + 1} slides · {STYLES[selected_style].name} style · {selected_theme} theme. "
+            "Pick another style or theme above to redraw it with the same content."
         )
+    with button_column:
         st.download_button(
-            label="📥 Download the finished .pptx file",
+            label="📥 Download .pptx",
             data=st.session_state["pptx_bytes"],
             file_name=st.session_state["file_name"],
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            use_container_width=True
+            type="primary",
+            width="stretch",
         )
-        with st.expander("🔍 View generated JSON"):
-            st.json(slides_data)
+    for warning in st.session_state.get("photo_warnings", []):
+        st.warning(f"⚠️ {warning}")
+
+    show_slides(st.session_state["preview"])
+    st.caption(
+        "The preview is drawn by the browser and may differ slightly from PowerPoint "
+        "(for example if a font is not installed on this computer)."
+    )
+
+    if photos:
+        with st.expander("📷 Photo credits"):
+            for keyword, photo in photos.items():
+                st.markdown(
+                    f"- *{keyword}*: photo by [{photo.author}]({photo.author_url}) on "
+                    "[Unsplash](https://unsplash.com/?utm_source=ai_pptx_generator&utm_medium=referral)"
+                )
+            st.caption("The same credits are saved in the speaker notes of the slides.")
+    with st.expander("🔍 Generated content (JSON)"):
+        st.json(deck.model_dump(exclude_none=True))
+else:
+    st.subheader("Example")
+    st.caption(
+        "This is a built-in sample presentation drawn in the selected style and theme. "
+        "Fill in the form on the left to generate your own."
+    )
+    show_slides(sample_preview(selected_style, selected_theme))

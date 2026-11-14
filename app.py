@@ -5,7 +5,7 @@ from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.llm import generate_structure_with_retry, parse_slides_json
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
-from generator.content.prompt import build_prompt
+from generator.content.prompt import MAX_DOC_CHARS, build_prompt
 from generator.design.themes import THEMES
 from generator.render.pptx_builder import create_pptx_in_memory
 
@@ -97,6 +97,11 @@ if submit_button:
         doc_text = extract_text_from_file(uploaded_file)
     except DocumentReadError as e:
         st.warning(f"⚠️ {e} The document was ignored.")
+    if len(doc_text) > MAX_DOC_CHARS:
+        st.info(
+            f"ℹ️ The document is long: only the first {MAX_DOC_CHARS:,} "
+            f"of its {len(doc_text):,} characters were used."
+        )
 
     if not topic.strip() and not doc_text.strip():
         st.warning("⚠️ Please enter a topic or upload a document!")

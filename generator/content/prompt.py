@@ -3,8 +3,9 @@ import json
 
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 
-# How many characters of the attached document are passed to the model.
-MAX_DOC_CHARS = 4000
+# How many characters of the attached document are passed to the model (about 25-30 pages).
+# A longer prompt costs more and takes longer, so the rest of the document is cut off.
+MAX_DOC_CHARS = 60_000
 
 
 def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides):

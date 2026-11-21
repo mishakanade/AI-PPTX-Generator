@@ -35,6 +35,7 @@ class Ctx:
     total: int              # number of slides in the deck
     deck_title: str
     images: Set[str]        # keys of the pictures that were actually downloaded
+    variant: int = 0        # 0 for the first slide of its type in the deck, 1 for the second...
 
 
 @dataclass

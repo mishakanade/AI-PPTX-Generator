@@ -18,7 +18,21 @@ from generator.render.textfit import text_height
 from tests.stress_deck import IMG, STRESS_DECK
 
 THEMES = ["Corporate Blue", "Pure Black", "Retro Cream", "Cyberpunk"]
-DECKS = {"sample": (SAMPLE_DECK, [SAMPLE_IMAGE]), "stress": (STRESS_DECK, [IMG])}
+
+
+def doubled(deck):
+    """Every slide twice in a row, so the second layout variant of every type is drawn too."""
+    copy = deck.model_copy(deep=True)
+    copy.slides = [slide for slide in deck.slides for _ in range(2)]
+    return copy
+
+
+DECKS = {
+    "sample": (SAMPLE_DECK, [SAMPLE_IMAGE]),
+    "stress": (STRESS_DECK, [IMG]),
+    "sample-x2": (doubled(SAMPLE_DECK), [SAMPLE_IMAGE]),
+    "stress-x2": (doubled(STRESS_DECK), [IMG]),
+}
 EPS = 0.02   # inches; rounding tolerance
 
 

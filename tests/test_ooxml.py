@@ -33,6 +33,9 @@ ORDER = {
                    "protection", "chart", "spPr", "txPr", "externalData", "printSettings", "userShapes", "extLst"],
     "plotArea": ["layout", ["barChart", "lineChart", "pieChart", "doughnutChart"], ["catAx", "valAx"],
                  "dTable", "spPr", "extLst"],
+    "transition": [["blinds", "checker", "circle", "dissolve", "comb", "cover", "cut", "diamond", "fade",
+                    "newsflash", "plus", "pull", "push", "random", "randomBar", "split", "strips", "wedge",
+                    "wheel", "wipe", "zoom"], "sndAc", "extLst"],
     "effectLst": ["blur", "fillOverlay", "glow", "innerShdw", "outerShdw", "prstShdw", "reflection", "softEdge"],
 }
 REPEATABLE = {"plotArea"}      # several axes in a row are allowed
@@ -75,7 +78,9 @@ DECKS = {"sample": (SAMPLE_DECK, SAMPLE_IMAGE), "sample-ru": (SAMPLE_DECK_RU, SA
 @pytest.mark.parametrize("deck_name, style", list(itertools.product(DECKS, STYLES)))
 def test_generated_xml_follows_the_schema_order(deck_name, style):
     deck, image = DECKS[deck_name]
-    data = build_pptx(deck, style, "Corporate Blue", {image: sample_photo()}, credits={image: "Photo by X"})
+    transition = ["fade", "push", "wipe", None, "fade"][list(STYLES).index(style)]
+    data = build_pptx(deck, style, "Corporate Blue", {image: sample_photo()}, credits={image: "Photo by X"},
+                      transition=transition)
     archive = zipfile.ZipFile(io.BytesIO(data))
     problems = []
     for name in archive.namelist():

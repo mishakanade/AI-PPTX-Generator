@@ -72,7 +72,7 @@ def test_generate_then_change_design_without_new_requests(fakes):
     app.button(key="style_bold").click().run()             # another style
     app.selectbox(key="theme").set_value("Cyberpunk").run()         # another colour theme
     assert not app.exception and not app.error
-    assert app.session_state["rendered_design"] == ("bold", "Cyberpunk")
+    assert app.session_state["rendered_design"] == ("bold", "Cyberpunk", None)
     assert app.session_state["pptx_bytes"] != first_file
     assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)  # nothing was generated again
 
@@ -276,7 +276,7 @@ def test_a_saved_project_opens_with_its_design(fakes):
     app = generated_app(fakes)
     custom = {"bg": (16, 32, 48), "title": (250, 250, 250), "text": (220, 220, 220), "accent": (255, 120, 0)}
     raw = save_project(app.session_state["deck"], app.session_state["photos"], "soft", custom,
-                       {"tone": "💼 Professional", "text_amount": "Balanced", "speaker_notes": False})
+                       {"tone": "💼 Professional", "text_amount": "Balanced", "speaker_notes": False}, "fade")
 
     fresh = AppTest.from_file(APP, default_timeout=60).run()
     fresh.file_uploader(key="project_file").set_value(("deck.project.json", raw, "application/json")).run()
@@ -284,7 +284,7 @@ def test_a_saved_project_opens_with_its_design(fakes):
     assert fresh.session_state["deck"] == app.session_state["deck"]
     assert fresh.session_state["style"] == "soft" and fresh.session_state["theme"] == "custom"
     assert fresh.session_state["custom_bg"] == "#102030"
-    assert fresh.session_state["rendered_design"] == ("soft", custom)
+    assert fresh.session_state["rendered_design"] == ("soft", custom, "fade")
     assert fakes["gemini"] == 1                         # opening did not ask the AI again
 
 
@@ -329,3 +329,14 @@ def test_another_photo_and_remove_photo(fakes, monkeypatch):
     version = app.session_state["edit_version"]
     app.button(key=f"remove_{version}_{index}").click().run()
     assert app.session_state["deck"].slides[index].image_keyword is None
+
+
+def test_choosing_a_transition_redraws_the_file(fakes):
+    from io import BytesIO
+    from pptx import Presentation
+    app = generated_app(fakes)
+    app.selectbox(key="transition").set_value("wipe").run()
+    assert not app.exception and app.session_state["rendered_design"][2] == "wipe"
+    slide = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides[0]
+    assert "<p:wipe" in slide._element.xml
+    assert fakes["gemini"] == 1

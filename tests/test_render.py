@@ -79,3 +79,13 @@ def test_photos_have_alternative_text():
                     for slide in Presentation(BytesIO(data)).slides for shape in slide.shapes
                     if shape.shape_type == 13]
     assert descriptions and all(d == SAMPLE_IMAGE for d in descriptions)
+
+
+def test_transitions_are_written_into_every_slide():
+    data = build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {}, transition="push")
+    for slide in Presentation(BytesIO(data)).slides:
+        transition = slide._element.find("{http://schemas.openxmlformats.org/presentationml/2006/main}transition")
+        assert transition is not None and transition[0].tag.endswith("push")
+    plain = build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {})
+    assert b"transition" not in b"".join(
+        s._element.xml.encode() for s in Presentation(BytesIO(plain)).slides)

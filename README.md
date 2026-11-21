@@ -28,6 +28,7 @@ The project is in alpha and is built solo, so expect changes.
   (photo on the left or right, card grid or numbered list, and so on).
 - **Text that fits.** The engine measures text before placing it, so titles and paragraphs
   shrink or grow to fit their space instead of overlapping.
+- **Slide transitions.** Fade, push or wipe between slides, played by PowerPoint.
 - **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
   PowerPoint's presenter view. Photo credits are added to the notes as well.
 - **Instant redesign.** After generation, pick another style or theme: the file is redrawn

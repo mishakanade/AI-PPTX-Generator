@@ -230,7 +230,7 @@ def open_project():
     deck = project["deck"]
     st.session_state.update(deck=deck, photos=project["photos"], photo_warnings=[],
                             file_name=safe_file_name(deck.title), settings=project["settings"],
-                            style=project["style"])
+                            style=project["style"], transition=project["transition"])
     theme = project["theme"]
     if isinstance(theme, dict):
         # custom colours: switch the theme list to "custom" and put the colours into the pickers
@@ -445,7 +445,7 @@ if error:
 # ----- design: colours and style ------------------------------------------------------------
 
 st.subheader(tr("design"))
-theme_column, _ = st.columns([1, 2])
+theme_column, transition_column, _ = st.columns([1, 1, 1])
 with theme_column:
     theme_choice = st.selectbox(
         tr("colour_theme"), list(THEMES.keys()) + [CUSTOM_THEME], key="theme",
@@ -469,6 +469,12 @@ with theme_column:
     else:
         selected_theme, theme_label = theme_choice, tr("theme_named", name=theme_choice)
     show_swatches(theme_colors(selected_theme))
+
+with transition_column:
+    transition = st.selectbox(
+        tr("transition"), [None, "fade", "push", "wipe"], key="transition", help=tr("transition_help"),
+        format_func=lambda name: tr(f"transition_{name or 'none'}"),
+    )
 
 st.markdown(f"**{tr('style')}**")
 for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
@@ -569,7 +575,7 @@ if request and "deck" not in st.session_state:
 # Whenever there is content and it was not drawn for the currently selected style and
 # theme (a new generation, or the user picked another design), draw it again.
 # No Gemini or Unsplash calls happen here, so switching designs is instant.
-design = (selected_style, selected_theme)
+design = (selected_style, selected_theme, transition)
 if "deck" in st.session_state and st.session_state.get("rendered_design") != design:
     deck, photos = st.session_state["deck"], st.session_state["photos"]
     try:
@@ -577,6 +583,7 @@ if "deck" in st.session_state and st.session_state.get("rendered_design") != des
             deck, selected_style, selected_theme,
             images={key: photo.data for key, photo in photos.items()},
             credits={key: photo.credit for key, photo in photos.items() if photo.credit},
+            transition=transition,
         )
         st.session_state["preview"] = build_preview(
             deck, selected_style, selected_theme,
@@ -609,7 +616,8 @@ if "pptx_bytes" in st.session_state:
         )
         st.download_button(
             label=tr("save_project"),
-            data=save_project(deck, photos, selected_style, selected_theme, st.session_state.get("settings")),
+            data=save_project(deck, photos, selected_style, selected_theme, st.session_state.get("settings"),
+                              transition),
             file_name=st.session_state["file_name"].removesuffix(".pptx") + ".project.json",
             mime="application/json",
             width="stretch",

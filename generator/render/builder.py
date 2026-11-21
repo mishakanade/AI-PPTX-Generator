@@ -28,14 +28,15 @@ def build_slides(deck, style_key, theme_name, image_keys, credits=None):
     return build_specs(deck, style, palette, image_keys, credits)
 
 
-def build_pptx(deck, style_key, theme_name, images, credits=None):
+def build_pptx(deck, style_key, theme_name, images, credits=None, transition=None):
     """Build the .pptx file and return it as bytes.
 
     images is {image_keyword: image bytes}; credits is {image_keyword: author line}
     and ends up in the speaker notes of the slides with those pictures.
+    transition: None, "fade", "push" or "wipe" - played between slides in PowerPoint.
     """
     specs = build_slides(deck, style_key, theme_name, images.keys(), credits)
-    return specs_to_pptx(specs, images, title=deck.title)
+    return specs_to_pptx(specs, images, title=deck.title, transition=transition)
 
 
 def build_preview(deck, style_key, theme_name, image_urls):

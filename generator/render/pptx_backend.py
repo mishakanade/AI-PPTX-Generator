@@ -296,7 +296,27 @@ def _draw_chart(slide, item):
     value_axis.tick_labels.number_format_is_linked = False
 
 
-def draw_slide(presentation, spec, images):
+# Transitions between slides: name -> the element inside <p:transition> (ECMA-376 basic set)
+TRANSITIONS = {
+    "fade": ("fade", {}),
+    "push": ("push", {"dir": "u"}),     # the new slide pushes the old one up
+    "wipe": ("wipe", {"dir": "r"}),     # the new slide is revealed from the left
+}
+
+
+def _set_transition(slide, name):
+    """<p:transition spd="med"><p:fade/></p:transition>, placed where the schema wants it."""
+    element, attributes = TRANSITIONS[name]
+    transition = etree.Element(qn("p:transition"), spd="med")
+    etree.SubElement(transition, qn(f"p:{element}"), **attributes)
+    sld = slide._element
+    anchor = sld.find(qn("p:clrMapOvr"))
+    if anchor is None:
+        anchor = sld.find(qn("p:cSld"))
+    anchor.addnext(transition)        # schema order: cSld, clrMapOvr, transition, timing, extLst
+
+
+def draw_slide(presentation, spec, images, transition=None):
     """Add one slide to the presentation and draw every item of its description."""
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])   # layout 6 is blank
     _apply_fill(slide.background.fill, spec.background)
@@ -311,17 +331,19 @@ def draw_slide(presentation, spec, images):
             _draw_chart(slide, item)
     if spec.notes:
         slide.notes_slide.notes_text_frame.text = spec.notes
+    if transition in TRANSITIONS:
+        _set_transition(slide, transition)
     return slide
 
 
-def specs_to_pptx(specs, images, title=""):
+def specs_to_pptx(specs, images, title="", transition=None):
     """Draw all slide descriptions and return the finished .pptx file as bytes."""
     presentation = Presentation()
     presentation.slide_width = Inches(SLIDE_W)
     presentation.slide_height = Inches(SLIDE_H)
     presentation.core_properties.title = title
     for spec in specs:
-        draw_slide(presentation, spec, images)
+        draw_slide(presentation, spec, images, transition)
     output = BytesIO()
     presentation.save(output)
     return output.getvalue()

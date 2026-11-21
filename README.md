@@ -120,7 +120,13 @@ description: one into PowerPoint, one into the browser. That is why the preview 
 ## Project structure
 
 ```
-app.py                       Streamlit interface: form, design picker, preview, download
+app.py                       the Streamlit page: puts the parts below together, top to bottom
+interface/
+  common.py                  translations, small helpers, values shared by the parts
+  sidebar.py                 language, AI provider and keys, the content form, opening a project
+  design.py                  colour theme, custom colours, transition, logo, style cards
+  generation.py              writing the content: API, copy & paste with a chat, plan first
+  result.py                  drawing the file, preview, download, editing, photos, notes
 ui_text.py                   every text of the interface, in English and Russian
 generator/
   config.py                  API keys and model names

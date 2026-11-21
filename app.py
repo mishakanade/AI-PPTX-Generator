@@ -114,22 +114,53 @@ st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wid
 st.title("📊 AI PPTX Generator")
 st.caption("Describe a topic, pick a design, and get an editable PowerPoint presentation.")
 
-if not config.GEMINI_API_KEY:
-    st.error(
-        "🔑 Gemini API key not found.\n\n"
-        "1. Get a key at https://aistudio.google.com/api-keys\n"
-        "2. Copy `.env.example` to `.env` in the project folder\n"
-        "3. Put the key into `GEMINI_API_KEY` and restart the app"
-    )
-    st.stop()  # nothing below can work without the key, so stop drawing the page here
-
-if not config.UNSPLASH_CLIENT_ID:
-    st.info(
-        "🖼️ Unsplash key not found, so presentations will be generated without photos. "
-        "To add them, put a key from https://unsplash.com/developers into `UNSPLASH_CLIENT_ID` in `.env`."
-    )
-
 st.session_state.setdefault("style", DEFAULT_STYLE)
+
+
+# ----- API keys -----------------------------------------------------------------------------
+# A key is taken from, in this order: the field in the sidebar (kept only in this browser
+# session), the .env file, or the secrets of a hosted app (Streamlit Community Cloud).
+
+def secret(name):
+    """A value from .streamlit/secrets.toml or the hosting's secrets, or None if there are none."""
+    try:
+        return st.secrets.get(name)
+    except Exception:          # no secrets file at all
+        return None
+
+
+server_gemini_key = config.GEMINI_API_KEY or secret("GEMINI_API_KEY")
+server_unsplash_key = config.UNSPLASH_CLIENT_ID or secret("UNSPLASH_CLIENT_ID")
+
+with st.sidebar:
+    with st.expander("🔑 API keys", expanded=not server_gemini_key):
+        typed_gemini_key = st.text_input(
+            "Gemini API key", type="password",
+            placeholder="Set on the server" if server_gemini_key else "Paste your key",
+            help="Get one at https://aistudio.google.com/api-keys",
+        ).strip()
+        typed_unsplash_key = st.text_input(
+            "Unsplash access key (optional)", type="password",
+            placeholder="Set on the server" if server_unsplash_key else "Without it: no photos",
+            help="Get one at https://unsplash.com/developers",
+        ).strip()
+        st.caption("Keys typed here stay only in this browser session and are not saved.")
+
+gemini_key = typed_gemini_key or server_gemini_key
+unsplash_key = typed_unsplash_key or server_unsplash_key
+
+if not gemini_key:
+    st.info(
+        "🔑 **A Gemini API key is needed to generate presentations.** Get one at "
+        "https://aistudio.google.com/api-keys and paste it into **API keys** in the sidebar, "
+        "or put it into `GEMINI_API_KEY` in the `.env` file and restart the app. "
+        "Until then you can explore the styles and themes below."
+    )
+elif not unsplash_key:
+    st.info(
+        "🖼️ No Unsplash key, so presentations will be generated without photos. "
+        "Add one (https://unsplash.com/developers) under **API keys** in the sidebar or in `.env`."
+    )
 
 
 # ----- sidebar: what the presentation is about -----------------------------------------------
@@ -197,7 +228,9 @@ if submit_button:
             f"of its {len(doc_text):,} characters were used."
         )
 
-    if not topic.strip() and not doc_text.strip():
+    if not gemini_key:
+        st.warning("⚠️ Add a Gemini API key under **API keys** in the sidebar first.")
+    elif not topic.strip() and not doc_text.strip():
         st.warning("⚠️ Please enter a topic or upload a document!")
     else:
         prompt = build_prompt(
@@ -216,9 +249,9 @@ if submit_button:
 
         with st.status("Writing the content with Gemini…", expanded=False) as status:
             try:
-                deck = generate_deck(prompt, max_slides=num_slides)
+                deck = generate_deck(prompt, max_slides=num_slides, api_key=gemini_key)
                 status.update(label="Looking for photos on Unsplash…")
-                photos, photo_warnings = fetch_photos(keywords_for(deck))
+                photos, photo_warnings = fetch_photos(keywords_for(deck), client_id=unsplash_key)
                 # The content and its photos are kept for the whole session;
                 # the file itself is built from them in the block below.
                 st.session_state["deck"] = deck

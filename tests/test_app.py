@@ -18,13 +18,14 @@ def fakes(monkeypatch):
     """Count calls to Gemini and Unsplash and answer them with ready-made data."""
     counts = {"gemini": 0, "unsplash": 0}
 
-    def fake_generate(prompt, max_slides=None, retries_per_model=2):
+    def fake_generate(prompt, max_slides=None, retries_per_model=2, api_key=None):
         counts["gemini"] += 1
+        counts["gemini_key"] = api_key
         deck = STRESS_DECK.model_copy(deep=True)
         deck.slides = deck.slides[:max_slides]
         return deck
 
-    def fake_photos(keywords):
+    def fake_photos(keywords, client_id=None):
         counts["unsplash"] += 1
         photo = unsplash.Photo(sample_photo(), sample_photo_url(), "Jane Doe", "https://unsplash.com/@jane")
         return {k: photo for k in keywords if k != "missing"}, []
@@ -36,29 +37,42 @@ def fakes(monkeypatch):
     return counts
 
 
-def test_without_gemini_key_the_page_explains_what_to_do(monkeypatch):
+def test_without_gemini_key_the_page_explains_and_nothing_is_sent(fakes, monkeypatch):
     monkeypatch.setattr(config, "GEMINI_API_KEY", None)
     app = AppTest.from_file(APP, default_timeout=60).run()
     assert not app.exception
-    assert "Gemini API key not found" in app.error[0].value
-    assert len(app.text_input) == 0          # the form is not shown
+    assert any("Gemini API key is needed" in i.value for i in app.info)
+    app.text_input[2].set_value("Космос")          # [0] and [1] are the key fields in the sidebar
+    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    assert any("Add a Gemini API key" in w.value for w in app.warning)
+    assert fakes["gemini"] == 0
+
+
+def test_a_key_typed_in_the_sidebar_is_used(fakes, monkeypatch):
+    monkeypatch.setattr(config, "GEMINI_API_KEY", None)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input[0].set_value("  typed-key  ")
+    app.text_input[2].set_value("Космос")
+    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    assert not app.exception and not app.error
+    assert fakes["gemini"] == 1 and fakes["gemini_key"] == "typed-key"
 
 
 def test_generate_then_change_design_without_new_requests(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
     assert not app.exception
-    app.text_input[0].set_value("Космос")
+    app.text_input[2].set_value("Космос")
     app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
     assert not app.exception and not app.error
     first_file = app.session_state["pptx_bytes"]
-    assert fakes == {"gemini": 1, "unsplash": 1}
+    assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)
 
     app.button(key="style_bold").click().run()             # another style
     app.selectbox[0].set_value("Cyberpunk").run()         # another colour theme
     assert not app.exception and not app.error
     assert app.session_state["rendered_design"] == ("bold", "Cyberpunk")
     assert app.session_state["pptx_bytes"] != first_file
-    assert fakes == {"gemini": 1, "unsplash": 1}           # nothing was generated again
+    assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)  # nothing was generated again
 
 
 def test_empty_form_asks_for_a_topic(fakes):
@@ -70,7 +84,7 @@ def test_empty_form_asks_for_a_topic(fakes):
 
 def test_editing_changes_the_file_without_new_requests(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
-    app.text_input[0].set_value("Космос")
+    app.text_input[2].set_value("Космос")
     app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
     deck = app.session_state["deck"]
     version = app.session_state["edit_version"]
@@ -84,4 +98,4 @@ def test_editing_changes_the_file_without_new_requests(fakes):
     assert edited.slides[0].title == "Совсем новый заголовок"
     assert len(edited.slides) == len(deck.slides) - 1
     assert app.session_state["edit_version"] == version + 1
-    assert fakes == {"gemini": 1, "unsplash": 1}
+    assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)

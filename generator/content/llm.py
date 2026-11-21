@@ -13,15 +13,15 @@ from generator.content.schema import ContentError, Deck, parse_deck
 RETRYABLE_CODES = (429, 500, 503, 504)   # rate limit and temporary server problems
 
 
-@functools.lru_cache(maxsize=1)
-def get_client():
-    """Create the Gemini client on first use and reuse the same one afterwards."""
-    return genai.Client(api_key=config.GEMINI_API_KEY, http_options=types.HttpOptions(timeout=60_000))
+@functools.lru_cache(maxsize=8)
+def get_client(api_key):
+    """Create a Gemini client for a key on first use and reuse it afterwards."""
+    return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=60_000))
 
 
-def _ask(model, prompt, use_schema):
+def _ask(model, prompt, use_schema, api_key):
     """One request to one model. Returns the raw text of the answer."""
-    response = get_client().models.generate_content(
+    response = get_client(api_key).models.generate_content(
         model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
@@ -34,8 +34,10 @@ def _ask(model, prompt, use_schema):
     return response.text
 
 
-def generate_deck(prompt, max_slides=None, retries_per_model=2):
+def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None):
     """Ask Gemini for a presentation and return it as a checked Deck.
+
+    api_key: the user's key; by default the one from .env (config.GEMINI_API_KEY).
 
     - Temporary failures (rate limit, server error, timeout) and unusable answers are
       retried with a growing pause, first on the same model, then on the next one in
@@ -44,13 +46,14 @@ def generate_deck(prompt, max_slides=None, retries_per_model=2):
       JSON mode: the prompt describes the format too, and parse_deck repairs the rest.
     - Any other error (for example a wrong API key) is raised immediately.
     """
+    api_key = api_key or config.GEMINI_API_KEY
     last_err = None
     for model in config.MODELS:
         use_schema = True
         attempt = 0
         while attempt < retries_per_model:
             try:
-                deck = parse_deck(_ask(model, prompt, use_schema))
+                deck = parse_deck(_ask(model, prompt, use_schema, api_key))
                 if max_slides:
                     deck.slides = deck.slides[:max_slides]
                 return deck

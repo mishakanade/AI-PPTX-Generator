@@ -40,17 +40,17 @@ class UnsplashLimitError(Exception):
     """Unsplash refused the request: wrong key or the hourly request limit is used up."""
 
 
-def _headers():
+def _headers(key):
     # The key travels in a header, not in the address, so it does not end up in logs.
-    return {"Authorization": f"Client-ID {config.UNSPLASH_CLIENT_ID}", "Accept-Version": "v1"}
+    return {"Authorization": f"Client-ID {key}", "Accept-Version": "v1"}
 
 
-def _search(client, keyword):
+def _search(client, keyword, key):
     """Return candidate photos for a keyword: a list of dicts from the Unsplash API."""
     response = client.get(
         f"{API_URL}/search/photos",
         params={"query": keyword.strip(), "per_page": CANDIDATES_PER_KEYWORD, "orientation": "landscape"},
-        headers=_headers(),
+        headers=_headers(key),
     )
     if response.status_code in (401, 403):
         raise UnsplashLimitError()
@@ -70,15 +70,15 @@ def _make_preview(data):
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-def _report_download(client, candidate):
+def _report_download(client, candidate, key):
     """Tell Unsplash that the photo is used (required by their API terms). Failures are ignored."""
     try:
-        client.get(candidate["links"]["download_location"], headers=_headers())
+        client.get(candidate["links"]["download_location"], headers=_headers(key))
     except Exception:
         pass
 
 
-def _download(client, candidate):
+def _download(client, candidate, key):
     """Download one chosen photo. Returns a Photo, or None if anything goes wrong."""
     try:
         response = client.get(candidate["urls"]["regular"])
@@ -91,18 +91,20 @@ def _download(client, candidate):
         )
     except Exception:
         return None
-    _report_download(client, candidate)
+    _report_download(client, candidate, key)
     return photo
 
 
-def fetch_photos(keywords):
+def fetch_photos(keywords, client_id=None):
     """Find and download one photo per keyword.
 
+    client_id: the user's Unsplash key; by default the one from .env.
     Returns (photos, warnings): photos is {keyword: Photo} and simply lacks the keywords
     for which nothing was found; warnings is a list of messages for the user.
     """
+    key = client_id or config.UNSPLASH_CLIENT_ID      # the user's key, or the one from .env
     keywords = list(dict.fromkeys(k for k in keywords if isinstance(k, str) and k.strip()))
-    if not keywords or not config.UNSPLASH_CLIENT_ID:
+    if not keywords or not key:
         return {}, []
 
     warnings = []
@@ -110,7 +112,7 @@ def fetch_photos(keywords):
         # 1. search, all keywords at once
         def safe_search(keyword):
             try:
-                return _search(client, keyword)
+                return _search(client, keyword, key)
             except UnsplashLimitError:
                 return "limit"
             except Exception:
@@ -132,7 +134,7 @@ def fetch_photos(keywords):
                 chosen[keyword] = pick
 
         # 3. download, all chosen photos at once
-        photos = dict(zip(chosen, pool.map(lambda c: _download(client, c), chosen.values())))
+        photos = dict(zip(chosen, pool.map(lambda c: _download(client, c, key), chosen.values())))
 
     return {keyword: photo for keyword, photo in photos.items() if photo}, warnings
 

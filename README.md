@@ -52,6 +52,22 @@ The project is in alpha and is built solo, so expect changes.
    python -m streamlit run app.py
    ```
 
+Instead of step 4 you can paste the keys into **API keys** in the app's sidebar. Keys typed
+there are kept only for that browser session and are never saved.
+
+## Publishing the app
+
+On a hosting such as Streamlit Community Cloud there is no `.env` file. Either let every
+visitor paste their own key in the sidebar (true BYOK), or give the app your keys as
+secrets, in TOML format:
+
+```toml
+GEMINI_API_KEY = "..."
+UNSPLASH_CLIENT_ID = "..."
+```
+
+Keep in mind that keys set as secrets are used by everyone who opens the app.
+
 ## How it works
 
 ```

@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 
 from generator import config
-from generator.content.schema import ContentError, Deck, parse_deck
+from generator.content.schema import ContentError, Deck, Slide, parse_deck, parse_slide
 
 RETRYABLE_CODES = (429, 500, 503, 504)   # rate limit and temporary server problems
 
@@ -19,19 +19,47 @@ def get_client(api_key):
     return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=60_000))
 
 
-def _ask(model, prompt, use_schema, api_key):
-    """One request to one model. Returns the raw text of the answer."""
+def _ask(model, prompt, schema, api_key):
+    """One request to one model. Returns the raw text of the answer.
+
+    schema is the pydantic class the answer must follow, or None for plain JSON mode.
+    """
     response = get_client(api_key).models.generate_content(
         model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             # With the schema the model is technically unable to answer in another shape.
-            response_schema=Deck if use_schema else None,
+            response_schema=schema,
             thinking_config=types.ThinkingConfig(thinking_level="low"),
         ),
     )
     return response.text
+
+
+def _request(prompt, schema, parse, api_key, retries_per_model):
+    """Send a prompt and return parse(answer), retrying the way generate_deck describes."""
+    api_key = api_key or config.GEMINI_API_KEY
+    last_err = None
+    for model in config.MODELS:
+        use_schema = True
+        attempt = 0
+        while attempt < retries_per_model:
+            try:
+                return parse(_ask(model, prompt, schema if use_schema else None, api_key))
+            except ContentError as e:
+                last_err = e              # the answer was unusable: simply ask again
+            except Exception as e:
+                last_err = e
+                code = getattr(e, "code", None)
+                if code == 400 and use_schema:
+                    use_schema = False    # schema not accepted: same attempt again without it
+                    continue
+                if code not in RETRYABLE_CODES and not isinstance(e, httpx.TimeoutException):
+                    raise
+                time.sleep(2 ** attempt + random.random())
+            attempt += 1
+    raise last_err
 
 
 def trim_slides(slides, limit):
@@ -55,27 +83,12 @@ def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None):
       JSON mode: the prompt describes the format too, and parse_deck repairs the rest.
     - Any other error (for example a wrong API key) is raised immediately.
     """
-    api_key = api_key or config.GEMINI_API_KEY
-    last_err = None
-    for model in config.MODELS:
-        use_schema = True
-        attempt = 0
-        while attempt < retries_per_model:
-            try:
-                deck = parse_deck(_ask(model, prompt, use_schema, api_key))
-                if max_slides:
-                    deck.slides = trim_slides(deck.slides, max_slides)
-                return deck
-            except ContentError as e:
-                last_err = e              # the answer was unusable: simply ask again
-            except Exception as e:
-                last_err = e
-                code = getattr(e, "code", None)
-                if code == 400 and use_schema:
-                    use_schema = False    # schema not accepted: same attempt again without it
-                    continue
-                if code not in RETRYABLE_CODES and not isinstance(e, httpx.TimeoutException):
-                    raise
-                time.sleep(2 ** attempt + random.random())
-            attempt += 1
-    raise last_err
+    deck = _request(prompt, Deck, parse_deck, api_key, retries_per_model)
+    if max_slides:
+        deck.slides = trim_slides(deck.slides, max_slides)
+    return deck
+
+
+def regenerate_slide(prompt, retries_per_model=2, api_key=None):
+    """Ask Gemini for one new slide (see prompt.build_slide_prompt) and return it checked."""
+    return _request(prompt, Slide, parse_slide, api_key, retries_per_model)

@@ -301,3 +301,19 @@ def parse_deck(raw_text):
     if not deck.slides:
         raise ContentError("The model returned a presentation without slides. Please try again.")
     return deck
+
+
+def parse_slide(raw_text):
+    """Turn the model's answer for a single slide into a checked and repaired Slide.
+
+    The slide goes through exactly the same checks as a slide of a whole presentation.
+    Raises ContentError when the answer is not a slide at all.
+    """
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        data = json.loads(match.group(0) if match else raw_text)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    if not isinstance(data, dict):
+        raise ContentError("The model returned a slide in an unexpected format. Please try again.")
+    return parse_deck(json.dumps({"title": "", "subtitle": "", "slides": [data]})).slides[0]

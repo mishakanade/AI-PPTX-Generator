@@ -154,3 +154,31 @@ def test_model_text_cannot_inject_markdown(fakes, monkeypatch):
     shown = [m.value for m in app.markdown] + [h.value for h in app.subheader]
     assert any("evil" in text for text in shown)                       # the text is shown...
     assert not any("![" in text for text in shown)                     # ...but never as a picture
+
+
+def test_regenerating_one_slide_replaces_only_that_slide(fakes, monkeypatch):
+    from generator.content.schema import Slide
+    prompts = []
+
+    def fake_regenerate(prompt, retries_per_model=2, api_key=None):
+        prompts.append(prompt)
+        return Slide(type="statement", title="Новый", subtitle="Совсем другая мысль")
+
+    monkeypatch.setattr(llm, "regenerate_slide", fake_regenerate)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Космос")
+    app.button(key="generate").click().run()
+    before = app.session_state["deck"]
+    version = app.session_state["edit_version"]
+
+    app.selectbox(key=f"regen_slide_{version}").set_value(1)
+    app.text_input(key=f"regen_wish_{version}").set_value("Одной фразой")
+    app.button(key="regen_button").click().run()
+    assert not app.exception and not app.error
+
+    after = app.session_state["deck"]
+    assert after.slides[1].title == "Новый" and after.slides[1].type == "statement"
+    assert [s.title for i, s in enumerate(after.slides) if i != 1] == \
+        [s.title for i, s in enumerate(before.slides) if i != 1]
+    assert "Одной фразой" in prompts[0] and "<-- THIS SLIDE" in prompts[0]
+    assert fakes["gemini"] == 1                    # the whole deck was not generated again

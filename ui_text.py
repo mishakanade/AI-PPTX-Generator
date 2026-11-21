@@ -114,6 +114,15 @@ TEXTS = {
         "author": "Author",
         "apply": "Apply changes",
         "keep_one": "⚠️ At least one slide must stay.",
+
+        # regenerating one slide
+        "regen_header": "🔄 Regenerate one slide",
+        "regen_caption": "Gemini rewrites only the chosen slide, keeping the rest. Optionally say what to change.",
+        "regen_slide": "Slide",
+        "regen_wish": "What to change (optional)",
+        "regen_wish_placeholder": "Shorter, with an example / Turn it into a chart",
+        "regen_button": "🔄 Regenerate",
+        "regen_working": "Gemini is rewriting the slide…",
     },
 
     "ru": {
@@ -214,6 +223,15 @@ TEXTS = {
         "author": "Автор",
         "apply": "Применить",
         "keep_one": "⚠️ Должен остаться хотя бы один слайд.",
+
+        "regen_header": "🔄 Пересоздать один слайд",
+        "regen_caption": "Gemini перепишет только выбранный слайд, остальные останутся как есть. "
+                         "Можно написать, что изменить.",
+        "regen_slide": "Слайд",
+        "regen_wish": "Что изменить (необязательно)",
+        "regen_wish_placeholder": "Короче и с примером / Сделай диаграммой",
+        "regen_button": "🔄 Пересоздать",
+        "regen_working": "Gemini переписывает слайд…",
     },
 }
 

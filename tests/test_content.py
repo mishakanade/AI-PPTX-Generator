@@ -55,8 +55,8 @@ def fake_model(monkeypatch):
     """Replace the real request with a list of scripted answers; records every call."""
     calls, script = [], []
 
-    def fake_ask(model, prompt, use_schema, api_key):
-        calls.append((model, use_schema))
+    def fake_ask(model, prompt, schema, api_key):
+        calls.append((model, schema is not None))
         answer = script.pop(0)
         if isinstance(answer, Exception):
             raise answer
@@ -168,3 +168,19 @@ def test_unreadable_documents_raise_a_clear_error(name, data, reason):
         extract_text_from_file(Upload(name, data))
     assert caught.value.reason == reason and caught.value.file_name == name
     assert name in str(caught.value)
+
+
+def test_regenerate_slide_parses_one_slide(fake_model):
+    calls, script = fake_model
+    script.append('{"type": "cards", "title": "New", "cards": [{"heading": "A", "text": "a"}, {"heading": "B", "text": "b"}]}')
+    slide = llm.regenerate_slide("prompt")
+    assert slide.type == "cards" and [c.heading for c in slide.cards] == ["A", "B"]
+
+
+def test_slide_prompt_marks_the_slide_and_passes_the_wish():
+    from generator.content.prompt import build_slide_prompt
+    from generator.design.sample_deck import SAMPLE_DECK
+    prompt = build_slide_prompt(SAMPLE_DECK, 3, "Make it a chart", "💼 Professional", "Balanced")
+    marked = [line for line in prompt.splitlines() if "<-- THIS SLIDE" in line]
+    assert marked == [f'  4. {SAMPLE_DECK.slides[3].type}: "{SAMPLE_DECK.slides[3].title}"   <-- THIS SLIDE']
+    assert '"Make it a chart"' in prompt

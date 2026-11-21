@@ -15,9 +15,9 @@ import ui_text
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.editing import apply_edits, slide_to_text
-from generator.content.llm import generate_deck
+from generator.content.llm import generate_deck, regenerate_slide
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
-from generator.content.prompt import MAX_DOC_CHARS, build_prompt
+from generator.content.prompt import MAX_DOC_CHARS, build_prompt, build_slide_prompt
 from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
 from generator.design.styles import DEFAULT_STYLE, STYLES
@@ -131,6 +131,44 @@ def edit_section(deck):
         st.session_state.pop("rendered_design", None)    # forces the redraw block to run
         st.session_state["edit_version"] = version + 1
         st.rerun()
+
+
+def regenerate_section(deck):
+    """Ask Gemini to rewrite one chosen slide, optionally following the user's wish."""
+    version = st.session_state.get("edit_version", 0)
+    with st.expander(tr("regen_header")):
+        st.caption(tr("regen_caption"))
+        index = st.selectbox(
+            tr("regen_slide"), range(len(deck.slides)), key=f"regen_slide_{version}",
+            format_func=lambda i: f"{i + 2}. {deck.slides[i].title}",
+        )
+        wish = st.text_input(tr("regen_wish"), placeholder=tr("regen_wish_placeholder"), key=f"regen_wish_{version}")
+        clicked = st.button(tr("regen_button"), key="regen_button", disabled=not gemini_key)
+    if not clicked:
+        return
+
+    # the slide is written with the settings of the original generation
+    settings = st.session_state.get("settings") or {"tone": next(iter(TONE_PRESETS)),
+                                                    "text_amount": "Balanced", "speaker_notes": True}
+    prompt = build_slide_prompt(deck, index, wish, settings["tone"], settings["text_amount"],
+                                settings["speaker_notes"])
+    with st.spinner(tr("regen_working")):
+        try:
+            slide = regenerate_slide(prompt, api_key=gemini_key)
+        except Exception as e:
+            st.error(tr("error", error=e))
+            return
+        photos = st.session_state["photos"]
+        if slide.type in ("bullets", "image") and slide.image_keyword and slide.image_keyword not in photos:
+            found, _ = fetch_photos([slide.image_keyword], client_id=unsplash_key)
+            photos.update(found)
+
+    slides = list(deck.slides)
+    slides[index] = slide
+    st.session_state["deck"] = deck.model_copy(update={"slides": slides})
+    st.session_state.pop("rendered_design", None)    # forces the redraw block to run
+    st.session_state["edit_version"] = version + 1     # the edit form shows the new text
+    st.rerun()
 
 
 def plain(text):
@@ -313,6 +351,8 @@ if submit_button:
                 st.session_state["photos"] = photos
                 st.session_state["photo_warnings"] = photo_warnings
                 st.session_state["file_name"] = safe_file_name(topic)
+                st.session_state["settings"] = {"tone": selected_tone, "text_amount": selected_text_amount,
+                                                "speaker_notes": speaker_notes}
                 st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
                 status.update(label=tr("status_done"), state="complete")
             except Exception as e:
@@ -369,6 +409,7 @@ if "pptx_bytes" in st.session_state:
     show_slides(st.session_state["preview"])
     st.caption(tr("preview_note"))
     edit_section(deck)
+    regenerate_section(deck)
 
     slides_with_notes = [(tr("title_slide"), deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
     if any(notes for _, notes in slides_with_notes):

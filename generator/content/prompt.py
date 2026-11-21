@@ -116,3 +116,56 @@ def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, spe
             "</document>",
         ]
     return "\n".join(lines)
+
+
+def build_slide_prompt(deck, index, instruction, tone, text_amount, speaker_notes=True):
+    """The request to rewrite one slide of an existing presentation.
+
+    The model sees the outline of the whole deck (so the new slide fits in and does not
+    repeat its neighbours), the current content of the slide and the user's wish.
+    """
+    slide = deck.slides[index]
+    amount = TEXT_AMOUNT_PRESETS[text_amount]
+    outline = [f'  0. title slide: "{deck.title}"'] + [
+        f'  {i + 1}. {s.type}: "{s.title}"' + ("   <-- THIS SLIDE" if i == index else "")
+        for i, s in enumerate(deck.slides)
+    ]
+    current = slide.model_dump(exclude_none=True)
+    current.pop("notes", None)
+
+    lines = [
+        "You are an expert presentation designer and writer. Rewrite ONE slide of an existing "
+        f'presentation titled "{deck.title}".',
+        "",
+        "Outline of the presentation:",
+        *outline,
+        "",
+        "Current content of the slide to rewrite:",
+        json.dumps(current, ensure_ascii=False, indent=2),
+        "",
+        "TONE:",
+        TONE_PRESETS[tone],
+        "",
+        "RULES:",
+        "- Write in the same language as the presentation; \"image_keyword\" stays in English.",
+        "- Do not repeat what the other slides of the outline already cover.",
+        "- Keep the same \"type\" unless the user's wish asks for a different presentation of the content. "
+        "Available types:",
+    ]
+    lines += [f'  - "{name}": {guide}' for name, guide in SLIDE_TYPE_GUIDE.items()]
+    lines += [
+        "- Fill only the fields listed for the chosen type and leave the others empty (null).",
+        f'- "bullets" slides: {amount["description"]} At most {amount["max_words"]} words in all bullets together.',
+        f'- Card texts, column points and timeline steps: at most {amount["item_words"]} words each.',
+        "- Facts must be real; do not invent numbers or quotations.",
+        '- For "bullets" and "image" slides fill "image_keyword": 2-4 English words naming something '
+        "that can be photographed.",
+    ]
+    if speaker_notes:
+        lines.append('- Fill "notes": 2-4 spoken sentences the presenter can say on this slide.')
+    if instruction.strip():
+        lines += ["", f'The user\'s wish for the new version: "{instruction.strip()}"']
+    else:
+        lines += ["", "The user wants a fresh, better version of this slide."]
+    lines += ["", "Return ONLY the JSON object of the single new slide."]
+    return "\n".join(lines)

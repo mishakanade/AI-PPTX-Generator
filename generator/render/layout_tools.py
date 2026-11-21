@@ -36,6 +36,7 @@ class Ctx:
     deck_title: str
     images: Set[str]        # keys of the pictures that were actually downloaded
     variant: int = 0        # 0 for the first slide of its type in the deck, 1 for the second...
+    footer_reserve: float = 0.0   # inches kept free at the bottom of content areas (for a logo)
 
 
 @dataclass

@@ -7,6 +7,7 @@ is kept in st.session_state.
 Every text on the page comes from ui_text.py, in the language chosen in the sidebar.
 Widgets have fixed keys, so what the user typed survives a change of language.
 """
+import hashlib
 import re
 import uuid
 
@@ -27,6 +28,7 @@ from generator.design.themes import THEMES
 from generator.images.unsplash import fetch_another, fetch_photos, keywords_for, own_photo
 from generator.project import load_project, save_project
 from generator.render.builder import build_pptx, build_preview, theme_colors
+from generator.render.logo import logo_aspect
 
 PREVIEW_COLUMNS = 3
 
@@ -231,6 +233,10 @@ def open_project():
     st.session_state.update(deck=deck, photos=project["photos"], photo_warnings=[],
                             file_name=safe_file_name(deck.title), settings=project["settings"],
                             style=project["style"], transition=project["transition"])
+    if project["logo"]:
+        st.session_state["logo"] = project["logo"]
+    else:
+        st.session_state.pop("logo", None)
     theme = project["theme"]
     if isinstance(theme, dict):
         # custom colours: switch the theme list to "custom" and put the colours into the pickers
@@ -240,6 +246,23 @@ def open_project():
     else:
         st.session_state["theme"] = theme
     st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
+
+
+def take_logo():
+    """Called when a logo file is chosen: keep it in the session if it is a picture."""
+    uploaded = st.session_state.get("logo_file")
+    if not uploaded:
+        return
+    try:
+        logo_aspect(uploaded.getvalue())
+    except ValueError:
+        st.session_state["logo_message"] = tr("logo_not_image")
+        return
+    st.session_state["logo"] = uploaded.getvalue()
+
+
+def remove_logo():
+    st.session_state.pop("logo", None)
 
 
 def changed_photos(deck=None):
@@ -475,6 +498,19 @@ with transition_column:
         tr("transition"), [None, "fade", "push", "wipe"], key="transition", help=tr("transition_help"),
         format_func=lambda name: tr(f"transition_{name or 'none'}"),
     )
+    # the logo lives in the session (not only in the uploader), so that an opened project can set it
+    logo = st.session_state.get("logo")
+    if logo:
+        picture, button = st.columns([1, 1], vertical_alignment="center")
+        picture.image(logo, width=110)
+        button.button(tr("logo_remove"), key="logo_remove", on_click=remove_logo)
+    else:
+        st.file_uploader(tr("logo"), type=["png", "jpg", "jpeg", "webp"], key="logo_file", on_change=take_logo,
+                         help=tr("logo_help"))
+    message = st.session_state.pop("logo_message", None)
+    if message:
+        st.warning(message)
+logo_id = hashlib.sha1(logo).hexdigest() if logo else None
 
 st.markdown(f"**{tr('style')}**")
 for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
@@ -575,7 +611,7 @@ if request and "deck" not in st.session_state:
 # Whenever there is content and it was not drawn for the currently selected style and
 # theme (a new generation, or the user picked another design), draw it again.
 # No Gemini or Unsplash calls happen here, so switching designs is instant.
-design = (selected_style, selected_theme, transition)
+design = (selected_style, selected_theme, transition, logo_id)
 if "deck" in st.session_state and st.session_state.get("rendered_design") != design:
     deck, photos = st.session_state["deck"], st.session_state["photos"]
     try:
@@ -584,10 +620,12 @@ if "deck" in st.session_state and st.session_state.get("rendered_design") != des
             images={key: photo.data for key, photo in photos.items()},
             credits={key: photo.credit for key, photo in photos.items() if photo.credit},
             transition=transition,
+            logo=logo,
         )
         st.session_state["preview"] = build_preview(
             deck, selected_style, selected_theme,
             {key: photo.preview_url for key, photo in photos.items()},
+            logo=logo,
         )
         st.session_state["rendered_design"] = design
     except Exception as e:
@@ -617,7 +655,7 @@ if "pptx_bytes" in st.session_state:
         st.download_button(
             label=tr("save_project"),
             data=save_project(deck, photos, selected_style, selected_theme, st.session_state.get("settings"),
-                              transition),
+                              transition, logo),
             file_name=st.session_state["file_name"].removesuffix(".pptx") + ".project.json",
             mime="application/json",
             width="stretch",

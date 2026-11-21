@@ -58,6 +58,10 @@ class Style:
         """Draw one card and say where its text goes and in which colours."""
         raise NotImplementedError
 
+    def bottom(self, ctx, usual):
+        """Where the content area ends: higher when room has to be left for a logo."""
+        return usual - ctx.footer_reserve
+
     def chart_background(self, ctx):
         """The colour right behind charts (used for the thin gaps between doughnut slices)."""
         background = self.background(ctx)
@@ -117,7 +121,7 @@ class Minimal(Style):
         line_y = t.y + t.h + 0.18
         top = line_y + 0.5
         items = self.decorate(ctx) + [t, Box(left, line_y, 0.7, 0.045, fill=p.accent)]
-        return items, Area(left, top, right - left, 6.75 - top)
+        return items, Area(left, top, right - left, self.bottom(ctx, 6.75) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -174,7 +178,7 @@ class Editorial(Style):
         p, left, right = ctx.palette, left or M, right or W - M
         t = heading(title, left, 1.25, right - left, self.heading_font, 34, p.title)
         top = t.y + t.h + 0.45
-        return self._masthead(ctx, left, right) + [t], Area(left, top, right - left, 6.85 - top)
+        return self._masthead(ctx, left, right) + [t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -228,7 +232,7 @@ class Corporate(Style):
         t.y = (band_h - t.h) / 2
         top = band_h + 0.5
         items = [Box(0, 0, W, band_h, fill=p.deep), Box(0, 0, 0.28, band_h, fill=p.accent), t]
-        return items + self.decorate(ctx), Area(left, top, right - left, 6.65 - top)
+        return items + self.decorate(ctx), Area(left, top, right - left, self.bottom(ctx, 6.65) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -293,7 +297,7 @@ class Soft(Style):
                             size=11, bold=True, color=p.accent, align="center", valign="middle")]
         t = heading(title, left, 1.18, right - left, self.heading_font, 32, p.title)
         top = t.y + t.h + 0.42
-        return self.decorate(ctx) + pill + [t], Area(left, top, right - left, 6.85 - top)
+        return self.decorate(ctx) + pill + [t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -371,7 +375,7 @@ class Bold(Style):
         t = heading(title, x, 0.72, title_w, self.heading_font, 34, p.title)
         top = t.y + t.h + 0.55
         bar = Box(left, t.y + 0.06, 0.14, t.h - 0.1, fill=p.accent)
-        return decor + [bar, t], Area(left, top, right - left, 6.85 - top)
+        return decor + [bar, t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette

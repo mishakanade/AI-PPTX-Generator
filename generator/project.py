@@ -13,6 +13,7 @@ from generator.content.schema import parse_deck
 from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import DEFAULT_THEME, THEMES
 from generator.images.unsplash import Photo, make_preview
+from generator.render.logo import logo_aspect
 
 FORMAT = "ai-pptx-generator-project"
 VERSION = 1
@@ -21,7 +22,7 @@ VERSION = 1
 TRANSITIONS = (None, "fade", "push", "wipe")
 
 
-def save_project(deck, photos, style, theme, settings=None, transition=None):
+def save_project(deck, photos, style, theme, settings=None, transition=None, logo=None):
     """The project as JSON bytes. theme is a theme name or a colour dict (custom colours)."""
     data = {
         "format": FORMAT,
@@ -32,6 +33,7 @@ def save_project(deck, photos, style, theme, settings=None, transition=None):
         "theme": {k: list(v) for k, v in theme.items()} if isinstance(theme, dict) else theme,
         "settings": settings or {},
         "transition": transition,
+        "logo": base64.b64encode(logo).decode() if logo else None,
         "photos": {
             key: {"data": base64.b64encode(photo.data).decode(), "author": photo.author,
                   "author_url": photo.author_url, "photo_id": photo.photo_id}
@@ -57,7 +59,7 @@ def load_project(raw):
     if not isinstance(data, dict) or data.get("format") != FORMAT:
         # not a project file: maybe just a presentation, e.g. an answer saved from an AI chat
         return {"deck": parse_deck(text), "photos": {}, "style": DEFAULT_STYLE, "theme": DEFAULT_THEME,
-                "settings": {}, "transition": None}
+                "settings": {}, "transition": None, "logo": None}
 
     deck = parse_deck(json.dumps(data.get("deck")))      # the same checks and repairs as a model answer
 
@@ -80,7 +82,14 @@ def load_project(raw):
     elif theme not in THEMES:
         theme = DEFAULT_THEME
     transition = data.get("transition") if data.get("transition") in TRANSITIONS else None
-    return {"deck": deck, "photos": photos, "style": style, "theme": theme, "transition": transition,
+    logo = None
+    if data.get("logo"):
+        try:
+            logo = base64.b64decode(data["logo"])
+            logo_aspect(logo)                         # check that it really is a picture
+        except Exception:
+            logo = None
+    return {"deck": deck, "photos": photos, "style": style, "theme": theme, "transition": transition, "logo": logo,
             "settings": data.get("settings") if isinstance(data.get("settings"), dict) else {}}
 
 

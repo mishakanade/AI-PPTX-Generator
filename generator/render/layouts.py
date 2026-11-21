@@ -525,7 +525,7 @@ LAYOUTS = {
 }
 
 
-def build_specs(deck, style, palette, image_keys, credits=None):
+def build_specs(deck, style, palette, image_keys, credits=None, footer_reserve=0.0):
     """Turn a whole Deck into slide descriptions: the title slide plus one per content slide.
 
     Speaker notes are the slide's own notes, followed by the photo credit (credits maps
@@ -533,7 +533,8 @@ def build_specs(deck, style, palette, image_keys, credits=None):
     """
     credits = credits or {}
     total = len(deck.slides) + 1
-    ctx = Ctx(palette=palette, style=style, number=1, total=total, deck_title=deck.title, images=set(image_keys))
+    ctx = Ctx(palette=palette, style=style, number=1, total=total, deck_title=deck.title, images=set(image_keys),
+              footer_reserve=footer_reserve)
     cover = style.cover(ctx, "title", deck.title, deck.subtitle)
     cover.notes = deck.notes or ""
     specs = [cover]

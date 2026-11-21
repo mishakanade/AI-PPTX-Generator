@@ -78,6 +78,10 @@ TEXTS = {
         "transition_fade": "Fade",
         "transition_push": "Push",
         "transition_wipe": "Wipe",
+        "logo": "Logo (optional)",
+        "logo_help": "Placed in a free corner of every slide. A PNG with a transparent background looks best.",
+        "logo_remove": "✖ Remove logo",
+        "logo_not_image": "⚠️ The logo file is not a picture.",
         "selected": "✓ Selected",
         "select": "Select",
 
@@ -245,6 +249,10 @@ TEXTS = {
         "transition_fade": "Растворение",
         "transition_push": "Сдвиг",
         "transition_wipe": "Появление",
+        "logo": "Логотип (необязательно)",
+        "logo_help": "Ставится в свободный угол каждого слайда. Лучше всего — PNG с прозрачным фоном.",
+        "logo_remove": "✖ Убрать логотип",
+        "logo_not_image": "⚠️ Файл логотипа не похож на картинку.",
         "selected": "✓ Выбран",
         "select": "Выбрать",
 

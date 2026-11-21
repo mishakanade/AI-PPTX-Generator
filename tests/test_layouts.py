@@ -42,7 +42,7 @@ def occupied(block):
 
     Charts cover their whole rectangle.
     """
-    if isinstance(block, ChartShape):
+    if isinstance(block, (ChartShape, Picture)):
         return block.y, block.y + block.h
     used = min(text_height(block), block.h) if block.h else text_height(block)
     if block.valign == "middle":
@@ -60,17 +60,32 @@ def is_decoration(block):
 
 
 def describe(item):
+    if isinstance(item, Picture):
+        return "the logo"
     return "a chart" if isinstance(item, ChartShape) else repr(item.paragraphs[0].text[:30])
 
 
 CASES = list(itertools.product(DECKS, STYLES, THEMES))
 
 
+def logo_png(width, height):
+    from io import BytesIO
+    from PIL import Image
+    buffer = BytesIO()
+    Image.new("RGBA", (width, height), (200, 30, 30, 255)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+WIDE_LOGO, SQUARE_LOGO = logo_png(600, 150), logo_png(200, 200)
+
+
 @pytest.fixture(scope="module", params=CASES, ids=["-".join(c) for c in CASES])
 def slides(request):
     deck_name, style, theme = request.param
     deck, images = DECKS[deck_name]
-    return build_slides(deck, style, theme, images)
+    # every other case has a logo, so its placement is checked by the same geometry tests
+    logo = [None, WIDE_LOGO, SQUARE_LOGO][CASES.index(request.param) % 3]
+    return build_slides(deck, style, theme, images, logo=logo)
 
 
 def test_text_and_pictures_stay_on_the_slide(slides):
@@ -98,6 +113,7 @@ def test_texts_do_not_overlap(slides):
     for number, spec in enumerate(slides, 1):
         texts = [t for t in spec.items if isinstance(t, Text) and not is_decoration(t)]
         texts += [c for c in spec.items if isinstance(c, ChartShape)]   # nothing may be written over a chart
+        texts += [p for p in spec.items if isinstance(p, Picture) and p.key == "__logo__"]   # nor over the logo
         for a, b in itertools.combinations(texts, 2):
             a_top, a_bottom = occupied(a)
             b_top, b_bottom = occupied(b)
@@ -113,3 +129,21 @@ def test_missing_photo_does_not_leave_a_hole():
     for style in STYLES:
         for spec in build_slides(STRESS_DECK, style, "Corporate Blue", []):
             assert not any(isinstance(item, Picture) for item in spec.items)
+
+
+def test_the_logo_is_placed_on_most_slides_and_never_on_photos():
+    from generator.render.logo import occupied
+    placed = total = 0
+    for style in STYLES:
+        for spec in build_slides(STRESS_DECK, style, "Corporate Blue", [IMG], logo=WIDE_LOGO):
+            total += 1
+            logos = [p for p in spec.items if isinstance(p, Picture) and p.key == "__logo__"]
+            placed += len(logos)
+            photos = [p for p in spec.items if isinstance(p, Picture) and p.key != "__logo__"
+                      and p.w * p.h < 0.6 * 13.333 * 7.5]          # full-slide background photos may hold it
+            for logo in logos:
+                assert logo.w <= 1.5 + EPS and logo.h <= 0.36 + EPS
+                for photo in photos:
+                    a, b = occupied(logo), occupied(photo)
+                    assert not (a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3])
+    assert placed / total > 0.95, f"logo on only {placed} of {total} slides"

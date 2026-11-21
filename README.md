@@ -28,6 +28,8 @@ The project is in alpha and is built solo, so expect changes.
   (photo on the left or right, card grid or numbered list, and so on).
 - **Text that fits.** The engine measures text before placing it, so titles and paragraphs
   shrink or grow to fit their space instead of overlapping.
+- **Your logo on every slide.** It is placed automatically in a free corner of each slide,
+  never over text, photos or charts; transparent PNGs keep their transparency.
 - **Slide transitions.** Fade, push or wipe between slides, played by PowerPoint.
 - **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
   PowerPoint's presenter view. Photo credits are added to the notes as well.
@@ -145,6 +147,7 @@ generator/
     builder.py               entry point: content + style + theme + photos → slides
     pptx_backend.py          draws slides into a .pptx file
     html_backend.py          draws slides as HTML for the preview
+    logo.py                  puts the logo into a free corner of each slide
 tests/                       automated tests (see below)
 tools/
   render_samples.py          saves the example deck in every style to samples/

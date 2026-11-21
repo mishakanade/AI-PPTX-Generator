@@ -72,7 +72,7 @@ def test_generate_then_change_design_without_new_requests(fakes):
     app.button(key="style_bold").click().run()             # another style
     app.selectbox(key="theme").set_value("Cyberpunk").run()         # another colour theme
     assert not app.exception and not app.error
-    assert app.session_state["rendered_design"] == ("bold", "Cyberpunk", None)
+    assert app.session_state["rendered_design"] == ("bold", "Cyberpunk", None, None)
     assert app.session_state["pptx_bytes"] != first_file
     assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)  # nothing was generated again
 
@@ -284,7 +284,7 @@ def test_a_saved_project_opens_with_its_design(fakes):
     assert fresh.session_state["deck"] == app.session_state["deck"]
     assert fresh.session_state["style"] == "soft" and fresh.session_state["theme"] == "custom"
     assert fresh.session_state["custom_bg"] == "#102030"
-    assert fresh.session_state["rendered_design"] == ("soft", custom, "fade")
+    assert fresh.session_state["rendered_design"][:3] == ("soft", custom, "fade")
     assert fakes["gemini"] == 1                         # opening did not ask the AI again
 
 
@@ -340,3 +340,27 @@ def test_choosing_a_transition_redraws_the_file(fakes):
     slide = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides[0]
     assert "<p:wipe" in slide._element.xml
     assert fakes["gemini"] == 1
+
+
+def test_a_logo_is_added_to_every_slide_and_saved_with_the_project(fakes):
+    from io import BytesIO
+    from PIL import Image
+    from pptx import Presentation
+    from generator.project import load_project, save_project
+    buffer = BytesIO()
+    Image.new("RGBA", (300, 100), (200, 0, 0, 255)).save(buffer, "PNG")
+    app = generated_app(fakes)
+    app.file_uploader(key="logo_file").set_value(("logo.png", buffer.getvalue(), "image/png")).run()
+    assert not app.exception and not app.error and app.session_state["logo"] == buffer.getvalue()
+    slides = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides
+    logos = [sh for slide in slides for sh in slide.shapes
+             if sh.shape_type == 13 and sh._element.nvPicPr.cNvPr.get("descr") == "Logo"]
+    assert len(logos) == len(slides)
+    assert fakes["gemini"] == 1
+
+    saved = save_project(app.session_state["deck"], app.session_state["photos"], "minimal", "Corporate Blue",
+                         logo=app.session_state["logo"])
+    assert load_project(saved)["logo"] == buffer.getvalue()
+
+    app.button(key="logo_remove").click().run()
+    assert "logo" not in app.session_state and app.session_state["rendered_design"][3] is None

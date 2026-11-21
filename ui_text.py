@@ -14,20 +14,33 @@ TEXTS = {
         "page_caption": "Describe a topic, pick a design, and get an editable PowerPoint presentation.",
         "language": "Language",
 
+        # AI provider
+        "ai_header": "🤖 AI",
+        "provider": "Who writes the content",
+        "provider_gemini": "Gemini API",
+        "provider_openai": "ChatGPT API (OpenAI)",
+        "provider_claude": "Claude API (Anthropic)",
+        "provider_chat": "Any AI chat (copy & paste)",
+        "model": "Model",
+        "model_help": "Leave empty for the default model.",
+        "chat_mode_info": "💬 No API key needed: after you press Generate, the app gives you a request "
+                          "to paste into ChatGPT, Claude, Gemini or any other AI chat.",
+
         # keys
         "keys_header": "🔑 API keys",
         "gemini_key": "Gemini API key",
+        "openai_key": "OpenAI API key",
+        "claude_key": "Anthropic API key",
         "unsplash_key": "Unsplash access key (optional)",
         "key_on_server": "Set on the server",
         "key_paste": "Paste your key",
         "key_no_photos": "Without it: no photos",
         "key_get": "Get one at {url}",
         "keys_note": "Keys typed here stay only in this browser session and are not saved.",
-        "need_gemini_key": (
-            "🔑 **A Gemini API key is needed to generate presentations.** Get one at "
-            "https://aistudio.google.com/api-keys and paste it into **API keys** in the sidebar, "
-            "or put it into `GEMINI_API_KEY` in the `.env` file and restart the app. "
-            "Until then you can explore the styles and themes below."
+        "need_ai_key": (
+            "🔑 **A {provider} API key is needed to generate presentations.** Get one at {url} "
+            "and paste it into **API keys** in the sidebar, or put it into `{env}` in the `.env` file "
+            "and restart the app. Or choose **Any AI chat (copy & paste)** to work without a key."
         ),
         "no_unsplash_key": (
             "🖼️ No Unsplash key, so presentations will be generated without photos. "
@@ -69,9 +82,9 @@ TEXTS = {
         "doc_empty": "No text found in {name}.",
         "doc_scan": "No text found in {name}. It may be a scan: pages stored as images, not text.",
         "doc_long": "ℹ️ The document is long: only the first {used:,} of its {total:,} characters were used.",
-        "add_key_first": "⚠️ Add a Gemini API key under **API keys** in the sidebar first.",
+        "add_key_first": "⚠️ Add a {provider} API key under **API keys** in the sidebar first.",
         "need_topic": "⚠️ Please enter a topic or upload a document!",
-        "status_writing": "Writing the content with Gemini…",
+        "status_writing": "Writing the content with {provider}…",
         "status_photos": "Looking for photos on Unsplash…",
         "status_done": "Content is ready",
         "status_failed": "Generation failed",
@@ -104,7 +117,7 @@ TEXTS = {
         # editing
         "edit_header": "✏️ Edit slides",
         "edit_caption": "Change titles and text, or delete slides. The file is redrawn without a new "
-                        "request to Gemini; photos and speaker notes are kept.",
+                        "request to the AI; photos and speaker notes are kept.",
         "deck_title": "Presentation title",
         "deck_subtitle": "Subtitle",
         "slide_heading": "Slide {number} · {type}",
@@ -115,33 +128,65 @@ TEXTS = {
         "apply": "Apply changes",
         "keep_one": "⚠️ At least one slide must stay.",
 
+        # copy & paste mode
+        "chat_header": "💬 Ask any AI chat",
+        "chat_steps": (
+            "1. Copy the request below (the button appears in its top-right corner).\n"
+            "2. Paste it into ChatGPT, Claude, Gemini or another AI chat and send it.\n"
+            "3. Copy the whole answer, paste it below and press **Build presentation**. "
+            "Photos are added automatically if an Unsplash key is set."
+        ),
+        "chat_answer": "The AI's answer",
+        "chat_answer_placeholder": "Paste the whole answer here, including the JSON",
+        "chat_file": "…or upload the answer as a file",
+        "chat_build": "🧩 Build presentation",
+        "chat_need_answer": "⚠️ Paste the AI's answer first.",
+        "chat_bad_answer": (
+            "❌ Could not read a presentation from this answer ({error}). Make sure you copied the "
+            "whole answer including the JSON; if it was cut off, ask the chat to continue and paste it all."
+        ),
+        "regen_chat_show": "📋 Show the request",
+        "regen_chat_apply": "Apply the answer",
+
         # regenerating one slide
         "regen_header": "🔄 Regenerate one slide",
-        "regen_caption": "Gemini rewrites only the chosen slide, keeping the rest. Optionally say what to change.",
+        "regen_caption": "The AI rewrites only the chosen slide, keeping the rest. Optionally say what to change.",
         "regen_slide": "Slide",
         "regen_wish": "What to change (optional)",
         "regen_wish_placeholder": "Shorter, with an example / Turn it into a chart",
         "regen_button": "🔄 Regenerate",
-        "regen_working": "Gemini is rewriting the slide…",
+        "regen_working": "{provider} is rewriting the slide…",
     },
 
     "ru": {
         "page_caption": "Опишите тему, выберите оформление и получите редактируемую презентацию PowerPoint.",
         "language": "Язык",
 
+        "ai_header": "🤖 ИИ",
+        "provider": "Кто пишет содержание",
+        "provider_gemini": "Gemini API",
+        "provider_openai": "ChatGPT API (OpenAI)",
+        "provider_claude": "Claude API (Anthropic)",
+        "provider_chat": "Любой ИИ-чат (копировать и вставить)",
+        "model": "Модель",
+        "model_help": "Оставьте пустым для модели по умолчанию.",
+        "chat_mode_info": "💬 Ключ API не нужен: после нажатия «Создать» приложение выдаст запрос, "
+                          "который нужно вставить в ChatGPT, Claude, Gemini или любой другой ИИ-чат.",
+
         "keys_header": "🔑 API-ключи",
         "gemini_key": "Ключ Gemini API",
+        "openai_key": "Ключ OpenAI API",
+        "claude_key": "Ключ Anthropic API",
         "unsplash_key": "Ключ Unsplash (необязательно)",
         "key_on_server": "Задан на сервере",
         "key_paste": "Вставьте ключ",
         "key_no_photos": "Без него — без фото",
         "key_get": "Получить: {url}",
         "keys_note": "Введённые здесь ключи живут только в этой сессии браузера и нигде не сохраняются.",
-        "need_gemini_key": (
-            "🔑 **Для генерации нужен ключ Gemini API.** Получите его на "
-            "https://aistudio.google.com/api-keys и вставьте в **API-ключи** на боковой панели "
-            "или впишите в `GEMINI_API_KEY` в файле `.env` и перезапустите приложение. "
-            "А пока можно посмотреть стили и палитры ниже."
+        "need_ai_key": (
+            "🔑 **Для генерации нужен ключ {provider} API.** Получите его на {url} и вставьте в "
+            "**API-ключи** на боковой панели или впишите в `{env}` в файле `.env` и перезапустите "
+            "приложение. Или выберите **Любой ИИ-чат (копировать и вставить)** — тогда ключ не нужен."
         ),
         "no_unsplash_key": (
             "🖼️ Нет ключа Unsplash, поэтому презентации будут без фотографий. "
@@ -180,9 +225,9 @@ TEXTS = {
         "doc_empty": "В файле {name} нет текста.",
         "doc_scan": "В файле {name} нет текста. Возможно, это скан: страницы сохранены картинками.",
         "doc_long": "ℹ️ Документ длинный: использованы первые {used:,} из {total:,} символов.",
-        "add_key_first": "⚠️ Сначала добавьте ключ Gemini API в **API-ключи** на боковой панели.",
+        "add_key_first": "⚠️ Сначала добавьте ключ {provider} API в **API-ключи** на боковой панели.",
         "need_topic": "⚠️ Введите тему или загрузите документ!",
-        "status_writing": "Gemini пишет содержание…",
+        "status_writing": "{provider} пишет содержание…",
         "status_photos": "Ищу фотографии на Unsplash…",
         "status_done": "Содержание готово",
         "status_failed": "Генерация не удалась",
@@ -213,7 +258,7 @@ TEXTS = {
 
         "edit_header": "✏️ Правка слайдов",
         "edit_caption": "Меняйте заголовки и текст или удаляйте слайды. Файл перерисуется без нового "
-                        "запроса к Gemini; фото и заметки сохранятся.",
+                        "запроса к ИИ; фото и заметки сохранятся.",
         "deck_title": "Название презентации",
         "deck_subtitle": "Подзаголовок",
         "slide_heading": "Слайд {number} · {type}",
@@ -224,14 +269,33 @@ TEXTS = {
         "apply": "Применить",
         "keep_one": "⚠️ Должен остаться хотя бы один слайд.",
 
+        "chat_header": "💬 Спросите любой ИИ-чат",
+        "chat_steps": (
+            "1. Скопируйте запрос ниже (кнопка появляется в его правом верхнем углу).\n"
+            "2. Вставьте его в ChatGPT, Claude, Gemini или другой ИИ-чат и отправьте.\n"
+            "3. Скопируйте весь ответ, вставьте его ниже и нажмите **Собрать презентацию**. "
+            "Фото добавятся сами, если задан ключ Unsplash."
+        ),
+        "chat_answer": "Ответ ИИ",
+        "chat_answer_placeholder": "Вставьте сюда весь ответ вместе с JSON",
+        "chat_file": "…или загрузите ответ файлом",
+        "chat_build": "🧩 Собрать презентацию",
+        "chat_need_answer": "⚠️ Сначала вставьте ответ ИИ.",
+        "chat_bad_answer": (
+            "❌ Не удалось прочитать презентацию из этого ответа ({error}). Проверьте, что скопирован "
+            "весь ответ вместе с JSON; если он оборвался, попросите чат продолжить и вставьте всё целиком."
+        ),
+        "regen_chat_show": "📋 Показать запрос",
+        "regen_chat_apply": "Применить ответ",
+
         "regen_header": "🔄 Пересоздать один слайд",
-        "regen_caption": "Gemini перепишет только выбранный слайд, остальные останутся как есть. "
+        "regen_caption": "ИИ перепишет только выбранный слайд, остальные останутся как есть. "
                          "Можно написать, что изменить.",
         "regen_slide": "Слайд",
         "regen_wish": "Что изменить (необязательно)",
         "regen_wish_placeholder": "Короче и с примером / Сделай диаграммой",
         "regen_button": "🔄 Пересоздать",
-        "regen_working": "Gemini переписывает слайд…",
+        "regen_working": "{provider} переписывает слайд…",
     },
 }
 

@@ -27,11 +27,19 @@ EXAMPLE_ANSWER = {
 }
 
 
-def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, speaker_notes=True):
+CHAT_ANSWER_RULE = (
+    "ANSWER FORMAT: reply with nothing but the JSON, in a single ```json code block. "
+    "No explanations before or after it, and do not use tools, files, canvas or artifacts: "
+    "the answer is copied into another program."
+)
+
+
+def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, speaker_notes=True, for_chat=False):
     """Assemble the prompt from everything the user chose in the form.
 
     tone and text_amount are keys of TONE_PRESETS / TEXT_AMOUNT_PRESETS.
     speaker_notes: ask the model to write what the presenter should say on each slide.
+    for_chat: the prompt will be pasted into an AI chat by hand (copy & paste mode).
     """
     tone_description = TONE_PRESETS[tone]
     amount = TEXT_AMOUNT_PRESETS[text_amount]
@@ -115,10 +123,12 @@ def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, spe
             doc_text[:MAX_DOC_CHARS],
             "</document>",
         ]
+    if for_chat:
+        lines += ["", CHAT_ANSWER_RULE]       # last, so it is the final thing the chat model reads
     return "\n".join(lines)
 
 
-def build_slide_prompt(deck, index, instruction, tone, text_amount, speaker_notes=True):
+def build_slide_prompt(deck, index, instruction, tone, text_amount, speaker_notes=True, for_chat=False):
     """The request to rewrite one slide of an existing presentation.
 
     The model sees the outline of the whole deck (so the new slide fits in and does not
@@ -168,4 +178,6 @@ def build_slide_prompt(deck, index, instruction, tone, text_amount, speaker_note
     else:
         lines += ["", "The user wants a fresh, better version of this slide."]
     lines += ["", "Return ONLY the JSON object of the single new slide."]
+    if for_chat:
+        lines += [CHAT_ANSWER_RULE]
     return "\n".join(lines)

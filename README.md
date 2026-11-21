@@ -1,7 +1,8 @@
 # AI-PPTX-Generator
 
 An open-source app that turns a topic or a document into an editable PowerPoint presentation.
-Gemini writes the content, Unsplash supplies the photos, and a layout engine designs every
+An AI of your choice writes the content (Gemini, ChatGPT or Claude through their APIs, or any
+AI chat by copy & paste), Unsplash supplies the photos, and a layout engine designs every
 slide in the style and colours you choose.
 
 It is a BYOK (Bring Your Own Key) application: you use your own API keys.
@@ -9,6 +10,10 @@ The project is in alpha and is built solo, so expect changes.
 
 ## What it does
 
+- **Your choice of AI.** Gemini, OpenAI (ChatGPT models) or Anthropic (Claude) through their
+  APIs, with the model name editable. Or **no API key at all**: in copy & paste mode the app
+  gives you a request to paste into ChatGPT, Claude, Gemini or any other AI chat, and builds
+  the presentation (photos included) from the answer you paste back.
 - **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file
   (up to about 60,000 characters are used). Choose the tone, the amount of text per slide
   and the number of slides, and add your own wishes.
@@ -26,9 +31,9 @@ The project is in alpha and is built solo, so expect changes.
 - **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
   PowerPoint's presenter view. Photo credits are added to the notes as well.
 - **Instant redesign.** After generation, pick another style or theme: the file is redrawn
-  with the same content, without a new request to Gemini.
+  with the same content, without a new request to the AI.
 - **Edit before you download.** Change titles and text or delete slides in a simple form;
-  the file is redrawn without asking the model again. Or let Gemini rewrite a single slide,
+  the file is redrawn without asking the model again. Or let the AI rewrite a single slide,
   optionally with a wish such as "shorter" or "turn it into a chart".
 - **Preview in the browser** before you download.
 - **Interface in English or Russian**, chosen from the browser's language and switchable in
@@ -36,8 +41,10 @@ The project is in alpha and is built solo, so expect changes.
 
 ## Getting started
 
-1. Get the API keys:
-   - Gemini (required): https://aistudio.google.com/api-keys
+1. Get the API keys you need:
+   - one AI key: Gemini (https://aistudio.google.com/api-keys), OpenAI
+     (https://platform.openai.com/api-keys) or Anthropic (https://platform.claude.com),
+     or none if you will use the copy & paste mode with an AI chat
    - Unsplash (optional, for photos): https://unsplash.com/developers
 2. Clone the project and open its folder:
    ```bash
@@ -48,9 +55,9 @@ The project is in alpha and is built solo, so expect changes.
    ```bash
    pip install -r requirements.txt
    ```
-4. Copy `.env.example` to a new file named `.env` and put your keys into
-   `GEMINI_API_KEY` and `UNSPLASH_CLIENT_ID`. Without the Unsplash key the app still works,
-   just without photos.
+4. Copy `.env.example` to a new file named `.env` and put your keys into it
+   (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `UNSPLASH_CLIENT_ID`). Without the
+   Unsplash key the app still works, just without photos.
 5. Start the app:
    ```bash
    python -m streamlit run app.py
@@ -81,7 +88,8 @@ topic / document
 content/prompt.py   builds the request: slide types, text limits, tone, language
       │
       ▼
-content/llm.py      asks Gemini for JSON in a strict schema, retries and falls back on failures
+content/llm.py      asks the chosen AI for JSON in a strict schema, retries and falls back on failures
+                    (or: the user pastes the answer of an AI chat)
       │
       ▼
 content/schema.py   checks the answer and repairs it, so every slide can be drawn
@@ -109,8 +117,9 @@ generator/
   config.py                  API keys and model names
   content/
     presets.py               tone and text-amount presets
-    prompt.py                builds the request for Gemini
+    prompt.py                builds the request for the AI (API or chat)
     llm.py                   sends it, retries, falls back to plain JSON if the schema is rejected
+    providers/               one module per AI provider: Gemini, OpenAI, Claude
     schema.py                slide types and fields; validation and repair of the answer
     documents.py             reads TXT / PDF / DOCX
     editing.py               slides as editable text and back

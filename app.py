@@ -15,8 +15,9 @@ import ui_text
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.editing import apply_edits, slide_to_text
-from generator.content.llm import generate_deck, regenerate_slide
+from generator.content.llm import generate_deck, regenerate_slide, trim_slides
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
+from generator.content.schema import ContentError, parse_deck, parse_slide
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt, build_slide_prompt
 from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
@@ -26,6 +27,15 @@ from generator.images.unsplash import fetch_photos, keywords_for
 from generator.render.builder import build_pptx, build_preview, theme_colors
 
 PREVIEW_COLUMNS = 3
+
+# The AI providers the user can choose from. "chat" means copy & paste with any AI chat app.
+PROVIDERS = {
+    "gemini": {"name": "Gemini", "env": "GEMINI_API_KEY", "url": "https://aistudio.google.com/api-keys"},
+    "openai": {"name": "OpenAI", "env": "OPENAI_API_KEY", "url": "https://platform.openai.com/api-keys"},
+    "claude": {"name": "Anthropic", "env": "ANTHROPIC_API_KEY", "url": "https://platform.claude.com"},
+    "chat": None,
+}
+DEFAULT_MODELS = {"gemini": config.MODELS[0], "openai": config.OPENAI_MODEL, "claude": config.CLAUDE_MODEL}
 CUSTOM_THEME = "custom"                  # internal value of the "custom colours" choice
 UNSPLASH_LINK = "https://unsplash.com/?utm_source=ai_pptx_generator&utm_medium=referral"
 
@@ -134,7 +144,7 @@ def edit_section(deck):
 
 
 def regenerate_section(deck):
-    """Ask Gemini to rewrite one chosen slide, optionally following the user's wish."""
+    """Rewrite one chosen slide with the AI, optionally following the user's wish."""
     version = st.session_state.get("edit_version", 0)
     with st.expander(tr("regen_header")):
         st.caption(tr("regen_caption"))
@@ -143,32 +153,71 @@ def regenerate_section(deck):
             format_func=lambda i: f"{i + 2}. {deck.slides[i].title}",
         )
         wish = st.text_input(tr("regen_wish"), placeholder=tr("regen_wish_placeholder"), key=f"regen_wish_{version}")
-        clicked = st.button(tr("regen_button"), key="regen_button", disabled=not gemini_key)
-    if not clicked:
-        return
 
-    # the slide is written with the settings of the original generation
-    settings = st.session_state.get("settings") or {"tone": next(iter(TONE_PRESETS)),
-                                                    "text_amount": "Balanced", "speaker_notes": True}
-    prompt = build_slide_prompt(deck, index, wish, settings["tone"], settings["text_amount"],
-                                settings["speaker_notes"])
-    with st.spinner(tr("regen_working")):
-        try:
-            slide = regenerate_slide(prompt, api_key=gemini_key)
-        except Exception as e:
-            st.error(tr("error", error=e))
-            return
-        photos = st.session_state["photos"]
-        if slide.type in ("bullets", "image") and slide.image_keyword and slide.image_keyword not in photos:
-            found, _ = fetch_photos([slide.image_keyword], client_id=unsplash_key)
-            photos.update(found)
+        # the slide is written with the settings of the original generation
+        settings = st.session_state.get("settings") or {"tone": next(iter(TONE_PRESETS)),
+                                                        "text_amount": "Balanced", "speaker_notes": True}
+        prompt = build_slide_prompt(deck, index, wish, settings["tone"], settings["text_amount"],
+                                    settings["speaker_notes"], for_chat=provider == "chat")
 
+        if provider == "chat":
+            # copy & paste: show the request, read the pasted answer
+            if st.button(tr("regen_chat_show"), key="regen_chat_show"):
+                st.session_state["regen_chat_prompt"] = (version, index, prompt)
+            shown = st.session_state.get("regen_chat_prompt")
+            if not shown or shown[0] != version or shown[1] != index:
+                return
+            st.code(shown[2], language=None, wrap_lines=True, height=220)
+            answer = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"),
+                                  key=f"regen_chat_answer_{version}")
+            if not st.button(tr("regen_chat_apply"), key="regen_chat_apply"):
+                return
+            if not answer.strip():
+                st.warning(tr("chat_need_answer"))
+                return
+            try:
+                slide = parse_slide(answer)
+            except ContentError as e:
+                st.error(tr("chat_bad_answer", error=e))
+                return
+        else:
+            if not st.button(tr("regen_button"), key="regen_button", disabled=not ai_key):
+                return
+            with st.spinner(tr("regen_working", provider=provider_name)):
+                try:
+                    slide = regenerate_slide(prompt, api_key=ai_key, provider=provider, model=ai_model)
+                except Exception as e:
+                    st.error(tr("error", error=e))
+                    return
+
+    photos = st.session_state["photos"]
+    if slide.type in ("bullets", "image") and slide.image_keyword and slide.image_keyword not in photos:
+        found, _ = fetch_photos([slide.image_keyword], client_id=unsplash_key)
+        photos.update(found)
     slides = list(deck.slides)
     slides[index] = slide
     st.session_state["deck"] = deck.model_copy(update={"slides": slides})
     st.session_state.pop("rendered_design", None)    # forces the redraw block to run
+    st.session_state.pop("regen_chat_prompt", None)
     st.session_state["edit_version"] = version + 1     # the edit form shows the new text
     st.rerun()
+
+
+def store_deck(deck, topic, settings):
+    """Keep a freshly written deck and its photos in the session; the file is drawn later."""
+    photos, photo_warnings = fetch_photos(keywords_for(deck), client_id=unsplash_key)
+    st.session_state["deck"] = deck
+    st.session_state["photos"] = photos
+    st.session_state["photo_warnings"] = photo_warnings
+    st.session_state["file_name"] = safe_file_name(topic)
+    st.session_state["settings"] = settings
+    st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
+
+
+def forget_presentation():
+    for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design",
+                "chat_request", "regen_chat_prompt"):
+        st.session_state.pop(key, None)
 
 
 def plain(text):
@@ -212,20 +261,36 @@ st.title("📊 AI PPTX Generator")
 st.caption(tr("page_caption"))
 
 
-# ----- API keys -----------------------------------------------------------------------------
+# ----- AI provider and API keys -------------------------------------------------------------
 # A key is taken from, in this order: the field in the sidebar (kept only in this browser
 # session), the .env file, or the secrets of a hosted app (Streamlit Community Cloud).
 
-server_gemini_key = config.GEMINI_API_KEY or secret("GEMINI_API_KEY")
+with st.sidebar:
+    st.subheader(tr("ai_header"))
+    provider = st.selectbox(tr("provider"), list(PROVIDERS), key="provider",
+                            format_func=lambda key: tr(f"provider_{key}"))
+
+info = PROVIDERS[provider]
+server_ai_key = None
+if info:
+    server_ai_key = getattr(config, info["env"]) \
+        or secret(info["env"])
 server_unsplash_key = config.UNSPLASH_CLIENT_ID or secret("UNSPLASH_CLIENT_ID")
 
 with st.sidebar:
-    with st.expander(tr("keys_header"), expanded=not server_gemini_key):
-        typed_gemini_key = st.text_input(
-            tr("gemini_key"), type="password", key="gemini_key",
-            placeholder=tr("key_on_server") if server_gemini_key else tr("key_paste"),
-            help=tr("key_get", url="https://aistudio.google.com/api-keys"),
-        ).strip()
+    typed_ai_key, ai_model = "", None
+    if info:
+        ai_model = st.text_input(tr("model"), key=f"model_{provider}", placeholder=DEFAULT_MODELS[provider],
+                                 help=tr("model_help")).strip() or None
+    else:
+        st.caption(tr("chat_mode_info"))
+    with st.expander(tr("keys_header"), expanded=bool(info) and not server_ai_key):
+        if info:
+            typed_ai_key = st.text_input(
+                tr(f"{provider}_key"), type="password", key=f"{provider}_key",
+                placeholder=tr("key_on_server") if server_ai_key else tr("key_paste"),
+                help=tr("key_get", url=info["url"]),
+            ).strip()
         typed_unsplash_key = st.text_input(
             tr("unsplash_key"), type="password", key="unsplash_key",
             placeholder=tr("key_on_server") if server_unsplash_key else tr("key_no_photos"),
@@ -233,11 +298,12 @@ with st.sidebar:
         ).strip()
         st.caption(tr("keys_note"))
 
-gemini_key = typed_gemini_key or server_gemini_key
+ai_key = (typed_ai_key or server_ai_key) if info else None
+provider_name = {"gemini": "Gemini", "openai": "ChatGPT", "claude": "Claude"}.get(provider, "")
 unsplash_key = typed_unsplash_key or server_unsplash_key
 
-if not gemini_key:
-    st.info(tr("need_gemini_key"))
+if info and not ai_key:
+    st.info(tr("need_ai_key", provider=info["name"], url=info["url"], env=info["env"]))
 elif not unsplash_key:
     st.info(tr("no_unsplash_key"))
 
@@ -321,8 +387,8 @@ if submit_button:
     if len(doc_text) > MAX_DOC_CHARS:
         st.info(tr("doc_long", used=MAX_DOC_CHARS, total=len(doc_text)))
 
-    if not gemini_key:
-        st.warning(tr("add_key_first"))
+    if info and not ai_key:
+        st.warning(tr("add_key_first", provider=info["name"]))
     elif not topic.strip() and not doc_text.strip():
         st.warning(tr("need_topic"))
     else:
@@ -334,30 +400,54 @@ if submit_button:
             commentary=additional_commentary,
             num_slides=num_slides,
             speaker_notes=speaker_notes,
+            for_chat=provider == "chat",
         )
+        settings = {"tone": selected_tone, "text_amount": selected_text_amount, "speaker_notes": speaker_notes}
+        forget_presentation()          # the previous presentation is replaced by the new one
 
-        # Forget the previous presentation before making a new one
-        for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design"):
-            st.session_state.pop(key, None)
+        if provider == "chat":
+            # copy & paste: the request is shown below; the deck is built when the answer comes back
+            st.session_state["chat_request"] = {"prompt": prompt, "topic": topic, "num_slides": num_slides,
+                                                "settings": settings}
+        else:
+            with st.status(tr("status_writing", provider=provider_name), expanded=False) as status:
+                try:
+                    deck = generate_deck(prompt, max_slides=num_slides, api_key=ai_key,
+                                         provider=provider, model=ai_model)
+                    status.update(label=tr("status_photos"))
+                    # The content and its photos are kept for the whole session;
+                    # the file itself is built from them in the block below.
+                    store_deck(deck, topic, settings)
+                    status.update(label=tr("status_done"), state="complete")
+                except Exception as e:
+                    status.update(label=tr("status_failed"), state="error")
+                    st.error(tr("error", error=e))
 
-        with st.status(tr("status_writing"), expanded=False) as status:
+
+# ----- copy & paste mode: show the request, read the answer ---------------------------------
+
+request = st.session_state.get("chat_request")
+if request and "deck" not in st.session_state:
+    st.subheader(tr("chat_header"))
+    st.markdown(tr("chat_steps"))
+    st.code(request["prompt"], language=None, wrap_lines=True, height=300)
+    pasted = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"), height=200,
+                          key="chat_answer")
+    answer_file = st.file_uploader(tr("chat_file"), type=["json", "txt", "md"], key="chat_file")
+    if st.button(tr("chat_build"), type="primary", key="chat_build"):
+        answer = answer_file.getvalue().decode("utf-8", errors="ignore") if answer_file else pasted
+        if not answer.strip():
+            st.warning(tr("chat_need_answer"))
+        else:
             try:
-                deck = generate_deck(prompt, max_slides=num_slides, api_key=gemini_key)
-                status.update(label=tr("status_photos"))
-                photos, photo_warnings = fetch_photos(keywords_for(deck), client_id=unsplash_key)
-                # The content and its photos are kept for the whole session;
-                # the file itself is built from them in the block below.
-                st.session_state["deck"] = deck
-                st.session_state["photos"] = photos
-                st.session_state["photo_warnings"] = photo_warnings
-                st.session_state["file_name"] = safe_file_name(topic)
-                st.session_state["settings"] = {"tone": selected_tone, "text_amount": selected_text_amount,
-                                                "speaker_notes": speaker_notes}
-                st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
-                status.update(label=tr("status_done"), state="complete")
-            except Exception as e:
-                status.update(label=tr("status_failed"), state="error")
-                st.error(tr("error", error=e))
+                deck = parse_deck(answer)
+            except ContentError as e:
+                st.error(tr("chat_bad_answer", error=e))
+            else:
+                deck.slides = trim_slides(deck.slides, request["num_slides"])
+                with st.spinner(tr("status_photos")):
+                    store_deck(deck, request["topic"], request["settings"])
+                st.rerun()
 
 
 # ----- rendering: runs whenever the content or the design changed ---------------------------

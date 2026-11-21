@@ -47,6 +47,32 @@ def ensure_contrast(color, background, toward, target=3.5):
     return toward
 
 
+def from_hex(value):
+    """'#1A2B3C' -> (26, 43, 60)."""
+    value = value.lstrip("#")
+    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def readable_theme(bg, title, text, accent):
+    """A theme from colours the user picked, adjusted where they would be hard to read.
+
+    Titles and body text need a contrast of 4.5 against the background (the usual
+    accessibility level for text), the accent 3. A colour that falls short is moved step
+    by step towards black or white, whichever the background needs.
+    Returns (theme dict, names of the colours that were changed).
+    """
+    toward = BLACK if luminance(bg) > 0.35 else WHITE
+    theme = {
+        "bg": bg,
+        "title": ensure_contrast(title, bg, toward, target=4.5),
+        "text": ensure_contrast(text, bg, toward, target=4.5),
+        "accent": ensure_contrast(accent, bg, toward, target=3.0),
+    }
+    changed = [name for name, picked in (("title", title), ("text", text), ("accent", accent))
+               if theme[name] != picked]
+    return theme, changed
+
+
 def to_hex(color):
     return "#{:02x}{:02x}{:02x}".format(*color)
 

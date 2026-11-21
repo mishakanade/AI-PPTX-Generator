@@ -99,3 +99,16 @@ def test_editing_changes_the_file_without_new_requests(fakes):
     assert len(edited.slides) == len(deck.slides) - 1
     assert app.session_state["edit_version"] == version + 1
     assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)
+
+
+def test_custom_colours_from_the_pickers(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.selectbox[0].set_value("✏️ Custom colours").run()
+    app.color_picker(key="custom_bg").set_value("#102030").run()
+    app.text_input[2].set_value("Космос")
+    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    assert not app.exception and not app.error
+    from io import BytesIO
+    from pptx import Presentation
+    slide = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides[0]
+    assert str(slide.background.fill.fore_color.rgb) == "102030"

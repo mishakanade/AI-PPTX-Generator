@@ -14,14 +14,15 @@ from generator.content.editing import HINTS, TYPE_NAMES, apply_edits, slide_to_t
 from generator.content.llm import generate_deck
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
-from generator.design.colors import to_hex
+from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE, sample_photo_url
 from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import THEMES
 from generator.images.unsplash import fetch_photos, keywords_for
-from generator.render.builder import build_pptx, build_preview
+from generator.render.builder import build_pptx, build_preview, theme_colors
 
 PREVIEW_COLUMNS = 3
+CUSTOM_THEME = "✏️ Custom colours"
 
 
 # ----- small helpers -----------------------------------------------------------------------
@@ -191,8 +192,22 @@ with st.sidebar:
 st.subheader("Design")
 theme_column, _ = st.columns([1, 2])
 with theme_column:
-    selected_theme = st.selectbox("Colour theme", list(THEMES.keys()))
-    show_swatches(THEMES[selected_theme])
+    theme_choice = st.selectbox("Colour theme", list(THEMES.keys()) + [CUSTOM_THEME])
+    if theme_choice == CUSTOM_THEME:
+        # four colour pickers, starting from the first built-in theme
+        start = THEMES[next(iter(THEMES))]
+        labels = {"bg": "Slide", "title": "Titles", "text": "Text", "accent": "Accent"}
+        picked = {
+            key: from_hex(column.color_picker(label, to_hex(tuple(start[key])), key=f"custom_{key}"))
+            for column, (key, label) in zip(st.columns(4), labels.items())
+        }
+        selected_theme, changed = readable_theme(**picked)
+        if changed:
+            st.caption("Adjusted for readability: " + ", ".join(labels[name].lower() for name in changed) + ".")
+        theme_label = "custom colours"
+    else:
+        selected_theme, theme_label = theme_choice, f"{theme_choice} theme"
+    show_swatches(theme_colors(selected_theme))
 
 st.markdown("**Style**")
 for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
@@ -297,7 +312,7 @@ if "pptx_bytes" in st.session_state:
     with title_column:
         st.subheader(deck.title)
         st.caption(
-            f"{len(deck.slides) + 1} slides · {STYLES[selected_style].name} style · {selected_theme} theme. "
+            f"{len(deck.slides) + 1} slides · {STYLES[selected_style].name} style · {theme_label}. "
             "Pick another style or theme above to redraw it with the same content."
         )
     with button_column:

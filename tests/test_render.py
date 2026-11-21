@@ -61,3 +61,13 @@ def test_charts_are_embedded_as_pictures_in_the_preview():
     index = next(i for i, slide in enumerate(SAMPLE_DECK.slides) if slide.type == "chart")
     html = build_preview(SAMPLE_DECK, "minimal", "Corporate Blue", {})[index + 1]
     assert "<svg" not in html and 'src="data:image/svg+xml;base64,' in html
+
+
+def test_custom_colours_are_used_and_made_readable():
+    from generator.design.colors import contrast, readable_theme
+    theme, changed = readable_theme((240, 240, 240), (200, 200, 200), (180, 180, 180), (230, 230, 120))
+    assert set(changed) == {"title", "text", "accent"}
+    assert contrast(theme["text"], theme["bg"]) >= 4.5 and contrast(theme["accent"], theme["bg"]) >= 3
+    data = build_pptx(SAMPLE_DECK, "minimal", theme, {})
+    background = Presentation(BytesIO(data)).slides[0].background.fill.fore_color.rgb
+    assert tuple(background) == (240, 240, 240)

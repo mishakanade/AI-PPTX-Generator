@@ -14,10 +14,17 @@ from generator.render.layouts import build_specs
 from generator.render.pptx_backend import specs_to_pptx
 
 
+def theme_colors(theme):
+    """A theme given by name (a key of THEMES) or directly as {"bg", "title", "text", "accent"}."""
+    if isinstance(theme, dict):
+        return theme
+    return THEMES.get(theme, THEMES[DEFAULT_THEME])
+
+
 def build_slides(deck, style_key, theme_name, image_keys, credits=None):
     """Describe every slide of the deck as a SlideSpec (what to draw and where)."""
     style = STYLES.get(style_key, STYLES[DEFAULT_STYLE])
-    palette = make_palette(THEMES.get(theme_name, THEMES[DEFAULT_THEME]))
+    palette = make_palette(theme_colors(theme_name))
     return build_specs(deck, style, palette, image_keys, credits)
 
 

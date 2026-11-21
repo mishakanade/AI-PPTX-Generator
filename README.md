@@ -17,8 +17,9 @@ The project is in alpha and is built solo, so expect changes.
   section divider and closing takeaways.
 - **Native, editable charts.** Column, bar, line and doughnut charts are real PowerPoint charts,
   so the data can be edited after download.
-- **5 design styles × 32 colour themes.** Minimal, Editorial, Corporate, Soft and Bold, each
-  working with every palette. Slides of the same type alternate between layout variants
+- **5 design styles × 32 colour themes, or your own colours.** Minimal, Editorial, Corporate,
+  Soft and Bold, each working with every palette. Custom colours (for example your brand's)
+  are checked for contrast and adjusted where text would be hard to read. Slides of the same type alternate between layout variants
   (photo on the left or right, card grid or numbered list, and so on).
 - **Text that fits.** The engine measures text before placing it, so titles and paragraphs
   shrink or grow to fit their space instead of overlapping.

@@ -30,6 +30,8 @@ The project is in alpha and is built solo, so expect changes.
 - **Edit before you download.** Change titles and text or delete slides in a simple form;
   the file is redrawn without asking the model again.
 - **Preview in the browser** before you download.
+- **Interface in English or Russian**, chosen from the browser's language and switchable in
+  the sidebar. The presentation itself is written in the language of your topic.
 
 ## Getting started
 
@@ -101,6 +103,7 @@ description: one into PowerPoint, one into the browser. That is why the preview 
 
 ```
 app.py                       Streamlit interface: form, design picker, preview, download
+ui_text.py                   every text of the interface, in English and Russian
 generator/
   config.py                  API keys and model names
   content/

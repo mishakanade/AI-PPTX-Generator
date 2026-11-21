@@ -14,6 +14,7 @@ Every slide type is shown to the user as a title plus one text box in a simple l
 
 slide_to_text() produces that text, apply_text() reads it back. The result goes through the
 same repair step as the model's answer, so an edit can never produce a slide that cannot be drawn.
+The names of the slide types and the hints shown next to the text box are in ui_text.py.
 """
 import re
 
@@ -24,27 +25,6 @@ from generator.content.schema import (
 # "Heading — text": a dash with spaces around it separates the two parts. Without the spaces it
 # is part of the text, so "1961–1963" or "5-7%" stay whole.
 _PAIR = re.compile(r"\s+[—–-]\s+")
-
-TYPE_NAMES = {
-    "bullets": "Bullet points", "image": "Photo with a statement", "two_columns": "Two columns",
-    "cards": "Cards", "stats": "Key numbers", "chart": "Chart", "quote": "Quote",
-    "statement": "Key statement", "timeline": "Timeline", "table": "Table", "agenda": "Agenda",
-    "section": "Section divider", "closing": "Closing takeaways",
-}
-
-HINTS = {
-    "bullets": "One point per line.",
-    "closing": "One takeaway per line.",
-    "agenda": "One part per line.",
-    "cards": "One card per line: Heading — text",
-    "stats": "One figure per line: 73% — what it means",
-    "timeline": "One step per line: 1969 — what happened",
-    "two_columns": "# Column heading, then its points. A blank line between the two columns.",
-    "table": "Cells separated by |. The first line holds the headers.",
-    "quote": "The quotation.",
-    "chart": "The insight shown next to the chart (optional). Edit the numbers in PowerPoint.",
-}
-
 
 def _lines(text):
     return [line.strip() for line in str(text or "").splitlines() if line.strip()]

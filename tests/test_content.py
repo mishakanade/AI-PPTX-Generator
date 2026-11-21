@@ -147,12 +147,15 @@ def blank_pdf():
     return buffer.getvalue()
 
 
-@pytest.mark.parametrize("name, data, message", [
+@pytest.mark.parametrize("name, data, reason", [
     ("broken.pdf", b"not a pdf", "damaged"),
     ("broken.docx", b"zzz", "damaged"),
     ("scan.pdf", blank_pdf(), "scan"),
-    ("empty.txt", b"   ", "No text"),
+    ("empty.txt", b"   ", "empty"),
+    ("slides.odp", b"x", "unsupported"),
 ])
-def test_unreadable_documents_raise_a_clear_error(name, data, message):
-    with pytest.raises(DocumentReadError, match=message):
+def test_unreadable_documents_raise_a_clear_error(name, data, reason):
+    with pytest.raises(DocumentReadError) as caught:
         extract_text_from_file(Upload(name, data))
+    assert caught.value.reason == reason and caught.value.file_name == name
+    assert name in str(caught.value)

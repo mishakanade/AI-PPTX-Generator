@@ -100,7 +100,8 @@ def fetch_photos(keywords, client_id=None):
 
     client_id: the user's Unsplash key; by default the one from .env.
     Returns (photos, warnings): photos is {keyword: Photo} and simply lacks the keywords
-    for which nothing was found; warnings is a list of messages for the user.
+    for which nothing was found; warnings is a list of codes for the interface to explain
+    (currently only "unsplash_limit").
     """
     key = client_id or config.UNSPLASH_CLIENT_ID      # the user's key, or the one from .env
     keywords = list(dict.fromkeys(k for k in keywords if isinstance(k, str) and k.strip()))
@@ -119,10 +120,8 @@ def fetch_photos(keywords, client_id=None):
                 return []
         found = dict(zip(keywords, pool.map(safe_search, keywords)))
         if "limit" in found.values():
-            warnings.append(
-                "Unsplash rejected some requests: the key is invalid or its hourly limit is used up, "
-                "so some slides have no photo."
-            )
+            # the key is invalid or its hourly limit is used up: some slides will have no photo
+            warnings.append("unsplash_limit")
 
         # 2. choose: the first candidate that is not already taken by another slide
         chosen, used_ids = {}, set()

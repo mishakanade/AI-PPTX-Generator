@@ -5,7 +5,23 @@ from docx.table import Table
 
 
 class DocumentReadError(Exception):
-    """The attached file could not be turned into text. The message is shown to the user."""
+    """The attached file could not be turned into text.
+
+    reason is a short code the interface translates: "unsupported", "damaged", "empty" or
+    "scan" (a PDF without a text layer). str(error) is an English explanation.
+    """
+
+    MESSAGES = {
+        "unsupported": "Unsupported file type: {name}.",
+        "damaged": "Could not read {name}: the file looks damaged.",
+        "empty": "No text found in {name}.",
+        "scan": "No text found in {name}. It may be a scan: pages stored as images, not text.",
+    }
+
+    def __init__(self, reason, file_name):
+        super().__init__(self.MESSAGES[reason].format(name=file_name))
+        self.reason = reason
+        self.file_name = file_name
 
 
 def _read_pdf(file):
@@ -44,13 +60,12 @@ def extract_text_from_file(uploaded_file):
         elif name.endswith(".docx"):
             text = _read_docx(uploaded_file)
         else:
-            raise DocumentReadError(f"Unsupported file type: {uploaded_file.name}.")
+            raise DocumentReadError("unsupported", uploaded_file.name)
     except DocumentReadError:
         raise
     except Exception as e:
-        raise DocumentReadError(f"Could not read {uploaded_file.name}: the file looks damaged.") from e
+        raise DocumentReadError("damaged", uploaded_file.name) from e
 
     if not text.strip():
-        hint = " It may be a scan: pages stored as images, not text." if name.endswith(".pdf") else ""
-        raise DocumentReadError(f"No text found in {uploaded_file.name}.{hint}")
+        raise DocumentReadError("scan" if name.endswith(".pdf") else "empty", uploaded_file.name)
     return text

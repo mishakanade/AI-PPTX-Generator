@@ -43,7 +43,7 @@ def test_without_gemini_key_the_page_explains_and_nothing_is_sent(fakes, monkeyp
     assert not app.exception
     assert any("Gemini API key is needed" in i.value for i in app.info)
     app.text_input[2].set_value("Космос")          # [0] and [1] are the key fields in the sidebar
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     assert any("Add a Gemini API key" in w.value for w in app.warning)
     assert fakes["gemini"] == 0
 
@@ -53,7 +53,7 @@ def test_a_key_typed_in_the_sidebar_is_used(fakes, monkeypatch):
     app = AppTest.from_file(APP, default_timeout=60).run()
     app.text_input[0].set_value("  typed-key  ")
     app.text_input[2].set_value("Космос")
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     assert not app.exception and not app.error
     assert fakes["gemini"] == 1 and fakes["gemini_key"] == "typed-key"
 
@@ -62,7 +62,7 @@ def test_generate_then_change_design_without_new_requests(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
     assert not app.exception
     app.text_input[2].set_value("Космос")
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     assert not app.exception and not app.error
     first_file = app.session_state["pptx_bytes"]
     assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)
@@ -77,7 +77,7 @@ def test_generate_then_change_design_without_new_requests(fakes):
 
 def test_empty_form_asks_for_a_topic(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     assert any("enter a topic" in w.value for w in app.warning)
     assert fakes["gemini"] == 0
 
@@ -85,13 +85,13 @@ def test_empty_form_asks_for_a_topic(fakes):
 def test_editing_changes_the_file_without_new_requests(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
     app.text_input[2].set_value("Космос")
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     deck = app.session_state["deck"]
     version = app.session_state["edit_version"]
 
     app.text_input(key=f"e{version}_0_title").set_value("Совсем новый заголовок")
     app.checkbox(key=f"e{version}_1_delete").check()
-    app.button(key=f"FormSubmitter:edit_form_{version}-Apply changes").click().run()
+    app.button(key=f"apply_{version}").click().run()
     assert not app.exception and not app.error
 
     edited = app.session_state["deck"]
@@ -106,9 +106,32 @@ def test_custom_colours_from_the_pickers(fakes):
     app.selectbox[0].set_value("✏️ Custom colours").run()
     app.color_picker(key="custom_bg").set_value("#102030").run()
     app.text_input[2].set_value("Космос")
-    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    app.button(key="generate").click().run()
     assert not app.exception and not app.error
     from io import BytesIO
     from pptx import Presentation
     slide = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides[0]
     assert str(slide.background.fill.fore_color.rgb) == "102030"
+
+
+def test_russian_interface(fakes):
+    app = AppTest.from_file(APP, default_timeout=60)
+    app.session_state["lang"] = "ru"
+    app.run()
+    assert not app.exception
+    assert app.subheader[0].value == "Оформление"
+    assert app.button(key="generate").label == "🚀 Создать презентацию"
+    app.text_input(key="topic").set_value("Космос")
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    assert "Слайдов:" in app.caption[-1].value or any("Слайдов:" in c.value for c in app.caption)
+    assert (fakes["gemini"], fakes["unsplash"]) == (1, 1)
+
+
+def test_typed_topic_survives_a_change_of_language(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Космос").run()
+    app.session_state["lang"] = "ru"
+    app.run()
+    assert app.text_input(key="topic").value == "Космос"
+    assert app.text_input(key="topic").label == "Тема презентации"

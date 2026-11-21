@@ -3,14 +3,18 @@
 Streamlit reruns this whole file from top to bottom on every click. Everything that
 must survive between reruns (the generated presentation, the photos, the chosen style)
 is kept in st.session_state.
+
+Every text on the page comes from ui_text.py, in the language chosen in the sidebar.
+Widgets have fixed keys, so what the user typed survives a change of language.
 """
 import re
 
 import streamlit as st
 
+import ui_text
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
-from generator.content.editing import HINTS, TYPE_NAMES, apply_edits, slide_to_text
+from generator.content.editing import apply_edits, slide_to_text
 from generator.content.llm import generate_deck
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
@@ -22,7 +26,30 @@ from generator.images.unsplash import fetch_photos, keywords_for
 from generator.render.builder import build_pptx, build_preview, theme_colors
 
 PREVIEW_COLUMNS = 3
-CUSTOM_THEME = "✏️ Custom colours"
+CUSTOM_THEME = "custom"                  # internal value of the "custom colours" choice
+UNSPLASH_LINK = "https://unsplash.com/?utm_source=ai_pptx_generator&utm_medium=referral"
+
+
+# ----- language -----------------------------------------------------------------------------
+
+def browser_language():
+    """'ru' if the browser asks for Russian, otherwise 'en'."""
+    try:
+        locale = st.context.locale or ""
+    except Exception:
+        locale = ""
+    return "ru" if locale.lower().startswith("ru") else "en"
+
+
+def current_language():
+    # the language switch can be clicked off (no choice): English then
+    return st.session_state.get("lang") or "en"
+
+
+def tr(key, **values):
+    """The text with this key in the current language, with {placeholders} filled in."""
+    text = ui_text.TEXTS[current_language()].get(key) or ui_text.TEXTS["en"][key]
+    return text.format(**values) if values else text
 
 
 # ----- small helpers -----------------------------------------------------------------------
@@ -67,35 +94,37 @@ def select_style(style_key):
 
 def edit_section(deck):
     """A form to change the text of the slides or delete slides, then redraw without Gemini."""
+    lang = current_language()
     # The widget keys include a version number: after a new generation or after applying edits
     # the form starts again from the current content instead of keeping old typed values.
     version = st.session_state.setdefault("edit_version", 0)
-    with st.expander("✏️ Edit slides"):
-        st.caption("Change titles and text, or delete slides. The file is redrawn without a new request "
-                   "to Gemini; photos and speaker notes are kept.")
+    with st.expander(tr("edit_header")):
+        st.caption(tr("edit_caption"))
         with st.form(f"edit_form_{version}", border=False):
-            title = st.text_input("Presentation title", deck.title, key=f"e{version}_title")
-            subtitle = st.text_input("Subtitle", deck.subtitle, key=f"e{version}_subtitle")
+            title = st.text_input(tr("deck_title"), deck.title, key=f"e{version}_title")
+            subtitle = st.text_input(tr("deck_subtitle"), deck.subtitle, key=f"e{version}_subtitle")
             edits = []
             for i, slide in enumerate(deck.slides):
                 st.divider()
                 head, remove = st.columns([4, 1], vertical_alignment="center")
-                head.markdown(f"**Slide {i + 2} · {TYPE_NAMES[slide.type]}**")
-                delete = remove.checkbox("Delete", key=f"e{version}_{i}_delete")
-                slide_title = st.text_input("Title", slide.title, key=f"e{version}_{i}_title")
+                type_name = ui_text.pick(ui_text.SLIDE_TYPES, lang, slide.type)
+                head.markdown("**" + tr("slide_heading", number=i + 2, type=type_name) + "**")
+                delete = remove.checkbox(tr("delete"), key=f"e{version}_{i}_delete")
+                slide_title = st.text_input(tr("slide_title"), slide.title, key=f"e{version}_{i}_title")
                 text = slide_to_text(slide)
+                hint = ui_text.EDIT_HINTS[lang].get(slide.type) or ui_text.EDIT_HINTS["en"].get(slide.type)
                 body = st.text_area(
-                    "Text", text, key=f"e{version}_{i}_text", help=HINTS.get(slide.type),
+                    tr("slide_text"), text, key=f"e{version}_{i}_text", help=hint,
                     height=max(68, min(260, 26 * (text.count("\n") + 2))),
                 )
                 author = None
                 if slide.type == "quote":
-                    author = st.text_input("Author", slide.author or "", key=f"e{version}_{i}_author")
+                    author = st.text_input(tr("author"), slide.author or "", key=f"e{version}_{i}_author")
                 edits.append(None if delete else (slide_title, body, author))
-            applied = st.form_submit_button("Apply changes", type="primary")
+            applied = st.form_submit_button(tr("apply"), type="primary", key=f"apply_{version}")
     if applied:
         if all(edit is None for edit in edits):
-            st.warning("⚠️ At least one slide must stay.")
+            st.warning(tr("keep_one"))
             return
         st.session_state["deck"] = apply_edits(deck, title, subtitle, edits)
         st.session_state.pop("rendered_design", None)    # forces the redraw block to run
@@ -109,19 +138,6 @@ def safe_file_name(topic):
     return f"{name or 'presentation'}.pptx"
 
 
-# ----- page header and key checks -----------------------------------------------------------
-
-st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide")
-st.title("📊 AI PPTX Generator")
-st.caption("Describe a topic, pick a design, and get an editable PowerPoint presentation.")
-
-st.session_state.setdefault("style", DEFAULT_STYLE)
-
-
-# ----- API keys -----------------------------------------------------------------------------
-# A key is taken from, in this order: the field in the sidebar (kept only in this browser
-# session), the .env file, or the secrets of a hosted app (Streamlit Community Cloud).
-
 def secret(name):
     """A value from .streamlit/secrets.toml or the hosting's secrets, or None if there are none."""
     try:
@@ -130,95 +146,111 @@ def secret(name):
         return None
 
 
+# ----- page header and language --------------------------------------------------------------
+
+st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide")
+st.session_state.setdefault("lang", browser_language())
+st.session_state.setdefault("style", DEFAULT_STYLE)
+
+with st.sidebar:
+    st.segmented_control(
+        tr("language"), options=list(ui_text.LANGUAGES), format_func=ui_text.LANGUAGES.get,
+        key="lang", label_visibility="collapsed",
+    )
+lang = current_language()
+
+st.title("📊 AI PPTX Generator")
+st.caption(tr("page_caption"))
+
+
+# ----- API keys -----------------------------------------------------------------------------
+# A key is taken from, in this order: the field in the sidebar (kept only in this browser
+# session), the .env file, or the secrets of a hosted app (Streamlit Community Cloud).
+
 server_gemini_key = config.GEMINI_API_KEY or secret("GEMINI_API_KEY")
 server_unsplash_key = config.UNSPLASH_CLIENT_ID or secret("UNSPLASH_CLIENT_ID")
 
 with st.sidebar:
-    with st.expander("🔑 API keys", expanded=not server_gemini_key):
+    with st.expander(tr("keys_header"), expanded=not server_gemini_key):
         typed_gemini_key = st.text_input(
-            "Gemini API key", type="password",
-            placeholder="Set on the server" if server_gemini_key else "Paste your key",
-            help="Get one at https://aistudio.google.com/api-keys",
+            tr("gemini_key"), type="password", key="gemini_key",
+            placeholder=tr("key_on_server") if server_gemini_key else tr("key_paste"),
+            help=tr("key_get", url="https://aistudio.google.com/api-keys"),
         ).strip()
         typed_unsplash_key = st.text_input(
-            "Unsplash access key (optional)", type="password",
-            placeholder="Set on the server" if server_unsplash_key else "Without it: no photos",
-            help="Get one at https://unsplash.com/developers",
+            tr("unsplash_key"), type="password", key="unsplash_key",
+            placeholder=tr("key_on_server") if server_unsplash_key else tr("key_no_photos"),
+            help=tr("key_get", url="https://unsplash.com/developers"),
         ).strip()
-        st.caption("Keys typed here stay only in this browser session and are not saved.")
+        st.caption(tr("keys_note"))
 
 gemini_key = typed_gemini_key or server_gemini_key
 unsplash_key = typed_unsplash_key or server_unsplash_key
 
 if not gemini_key:
-    st.info(
-        "🔑 **A Gemini API key is needed to generate presentations.** Get one at "
-        "https://aistudio.google.com/api-keys and paste it into **API keys** in the sidebar, "
-        "or put it into `GEMINI_API_KEY` in the `.env` file and restart the app. "
-        "Until then you can explore the styles and themes below."
-    )
+    st.info(tr("need_gemini_key"))
 elif not unsplash_key:
-    st.info(
-        "🖼️ No Unsplash key, so presentations will be generated without photos. "
-        "Add one (https://unsplash.com/developers) under **API keys** in the sidebar or in `.env`."
-    )
+    st.info(tr("no_unsplash_key"))
 
 
 # ----- sidebar: what the presentation is about -----------------------------------------------
 
 with st.sidebar:
-    st.header("Content")
+    st.header(tr("content"))
     with st.form("generation_form"):
-        topic = st.text_input("Presentation topic", placeholder="The History of Space Exploration")
-        uploaded_file = st.file_uploader("Source document (optional)", type=["txt", "pdf", "docx"])
-        selected_tone = st.selectbox("Tone", options=list(TONE_PRESETS.keys()))
+        topic = st.text_input(tr("topic"), placeholder=tr("topic_placeholder"), key="topic")
+        uploaded_file = st.file_uploader(tr("document"), type=["txt", "pdf", "docx"], key="document")
+        selected_tone = st.selectbox(
+            tr("tone"), options=list(TONE_PRESETS.keys()), key="tone",
+            format_func=lambda key: ui_text.pick(ui_text.TONES, lang, key),
+        )
         selected_text_amount = st.selectbox(
-            "Text amount per slide", options=list(TEXT_AMOUNT_PRESETS.keys()), index=2
+            tr("text_amount"), options=list(TEXT_AMOUNT_PRESETS.keys()), index=2, key="text_amount",
+            format_func=lambda key: ui_text.pick(ui_text.TEXT_AMOUNTS, lang, key),
         )
-        additional_commentary = st.text_input(
-            "Additional wishes (optional)", placeholder="Focus on the environmental impact"
-        )
-        num_slides = st.slider("Number of slides", min_value=2, max_value=15, value=6, step=1)
-        speaker_notes = st.checkbox(
-            "Write speaker notes", value=True,
-            help="What to say on each slide. Saved in the notes of the PowerPoint file.",
-        )
-        submit_button = st.form_submit_button("🚀 Generate presentation", type="primary", width="stretch")
-    st.caption("The design on the right can be changed at any time, even after generation.")
+        additional_commentary = st.text_input(tr("wishes"), placeholder=tr("wishes_placeholder"), key="wishes")
+        num_slides = st.slider(tr("num_slides"), min_value=2, max_value=15, value=6, step=1, key="num_slides")
+        speaker_notes = st.checkbox(tr("speaker_notes"), value=True, help=tr("speaker_notes_help"),
+                                    key="speaker_notes")
+        submit_button = st.form_submit_button(tr("generate"), type="primary", width="stretch", key="generate")
+    st.caption(tr("design_hint"))
 
 
 # ----- design: colours and style ------------------------------------------------------------
 
-st.subheader("Design")
+st.subheader(tr("design"))
 theme_column, _ = st.columns([1, 2])
 with theme_column:
-    theme_choice = st.selectbox("Colour theme", list(THEMES.keys()) + [CUSTOM_THEME])
+    theme_choice = st.selectbox(
+        tr("colour_theme"), list(THEMES.keys()) + [CUSTOM_THEME], key="theme",
+        format_func=lambda name: tr("custom_colours") if name == CUSTOM_THEME else name,
+    )
     if theme_choice == CUSTOM_THEME:
         # four colour pickers, starting from the first built-in theme
         start = THEMES[next(iter(THEMES))]
-        labels = {"bg": "Slide", "title": "Titles", "text": "Text", "accent": "Accent"}
+        labels = {key: tr(f"colour_{key}") for key in ("bg", "title", "text", "accent")}
         picked = {
             key: from_hex(column.color_picker(label, to_hex(tuple(start[key])), key=f"custom_{key}"))
             for column, (key, label) in zip(st.columns(4), labels.items())
         }
         selected_theme, changed = readable_theme(**picked)
         if changed:
-            st.caption("Adjusted for readability: " + ", ".join(labels[name].lower() for name in changed) + ".")
-        theme_label = "custom colours"
+            st.caption(tr("adjusted", names=", ".join(labels[name].lower() for name in changed)))
+        theme_label = tr("theme_custom")
     else:
-        selected_theme, theme_label = theme_choice, f"{theme_choice} theme"
+        selected_theme, theme_label = theme_choice, tr("theme_named", name=theme_choice)
     show_swatches(theme_colors(selected_theme))
 
-st.markdown("**Style**")
+st.markdown(f"**{tr('style')}**")
 for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
     with column, st.container(border=True):
         # each card shows the real title slide of the example deck in this style and theme
         show_slide(sample_preview(style_key, selected_theme)[0])
         st.markdown(f"**{style.name}**")
-        st.caption(style.description)
+        st.caption(ui_text.pick(ui_text.STYLE_DESCRIPTIONS, lang, style_key, default=style.description))
         is_selected = st.session_state["style"] == style_key
         st.button(
-            "✓ Selected" if is_selected else "Select",
+            tr("selected") if is_selected else tr("select"),
             key=f"style_{style_key}",
             type="primary" if is_selected else "secondary",
             on_click=select_style, args=(style_key,),
@@ -236,17 +268,14 @@ if submit_button:
     try:
         doc_text = extract_text_from_file(uploaded_file)
     except DocumentReadError as e:
-        st.warning(f"⚠️ {e} The document was ignored.")
+        st.warning(tr("doc_ignored", reason=tr(f"doc_{e.reason}", name=e.file_name)))
     if len(doc_text) > MAX_DOC_CHARS:
-        st.info(
-            f"ℹ️ The document is long: only the first {MAX_DOC_CHARS:,} "
-            f"of its {len(doc_text):,} characters were used."
-        )
+        st.info(tr("doc_long", used=MAX_DOC_CHARS, total=len(doc_text)))
 
     if not gemini_key:
-        st.warning("⚠️ Add a Gemini API key under **API keys** in the sidebar first.")
+        st.warning(tr("add_key_first"))
     elif not topic.strip() and not doc_text.strip():
-        st.warning("⚠️ Please enter a topic or upload a document!")
+        st.warning(tr("need_topic"))
     else:
         prompt = build_prompt(
             topic=topic,
@@ -262,10 +291,10 @@ if submit_button:
         for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design"):
             st.session_state.pop(key, None)
 
-        with st.status("Writing the content with Gemini…", expanded=False) as status:
+        with st.status(tr("status_writing"), expanded=False) as status:
             try:
                 deck = generate_deck(prompt, max_slides=num_slides, api_key=gemini_key)
-                status.update(label="Looking for photos on Unsplash…")
+                status.update(label=tr("status_photos"))
                 photos, photo_warnings = fetch_photos(keywords_for(deck), client_id=unsplash_key)
                 # The content and its photos are kept for the whole session;
                 # the file itself is built from them in the block below.
@@ -274,10 +303,10 @@ if submit_button:
                 st.session_state["photo_warnings"] = photo_warnings
                 st.session_state["file_name"] = safe_file_name(topic)
                 st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
-                status.update(label="Content is ready", state="complete")
+                status.update(label=tr("status_done"), state="complete")
             except Exception as e:
-                status.update(label="Generation failed", state="error")
-                st.error(f"❌ An error occurred: {e}")
+                status.update(label=tr("status_failed"), state="error")
+                st.error(tr("error", error=e))
 
 
 # ----- rendering: runs whenever the content or the design changed ---------------------------
@@ -301,7 +330,7 @@ if "deck" in st.session_state and st.session_state.get("rendered_design") != des
         st.session_state["rendered_design"] = design
     except Exception as e:
         st.session_state.pop("pptx_bytes", None)
-        st.error(f"❌ Could not build the presentation: {e}")
+        st.error(tr("build_error", error=e))
 
 
 # ----- result -------------------------------------------------------------------------------
@@ -311,51 +340,42 @@ if "pptx_bytes" in st.session_state:
     title_column, button_column = st.columns([2, 1], vertical_alignment="bottom")
     with title_column:
         st.subheader(deck.title)
-        st.caption(
-            f"{len(deck.slides) + 1} slides · {STYLES[selected_style].name} style · {theme_label}. "
-            "Pick another style or theme above to redraw it with the same content."
-        )
+        st.caption(tr("result_caption", count=len(deck.slides) + 1, style=STYLES[selected_style].name,
+                      theme=theme_label))
     with button_column:
         st.download_button(
-            label="📥 Download .pptx",
+            label=tr("download"),
             data=st.session_state["pptx_bytes"],
             file_name=st.session_state["file_name"],
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             type="primary",
             width="stretch",
+            key="download",
         )
     for warning in st.session_state.get("photo_warnings", []):
-        st.warning(f"⚠️ {warning}")
+        st.warning(f"⚠️ {tr(warning)}")
 
     show_slides(st.session_state["preview"])
-    st.caption(
-        "The preview is drawn by the browser and may differ slightly from PowerPoint "
-        "(for example if a font is not installed on this computer)."
-    )
+    st.caption(tr("preview_note"))
     edit_section(deck)
 
-    slides_with_notes = [("Title slide", deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
+    slides_with_notes = [(tr("title_slide"), deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
     if any(notes for _, notes in slides_with_notes):
-        with st.expander("🎤 Speaker notes"):
+        with st.expander(tr("notes_header")):
             for number, (title, notes) in enumerate(slides_with_notes, 1):
                 if notes:
                     st.markdown(f"**{number}. {title}**")
                     st.write(notes)
-            st.caption("The notes are also saved in the .pptx file: PowerPoint shows them in presenter view.")
+            st.caption(tr("notes_note"))
     if photos:
-        with st.expander("📷 Photo credits"):
+        with st.expander(tr("credits_header")):
             for keyword, photo in photos.items():
-                st.markdown(
-                    f"- *{keyword}*: photo by [{photo.author}]({photo.author_url}) on "
-                    "[Unsplash](https://unsplash.com/?utm_source=ai_pptx_generator&utm_medium=referral)"
-                )
-            st.caption("The same credits are saved in the speaker notes of the slides.")
-    with st.expander("🔍 Generated content (JSON)"):
+                st.markdown(tr("credit_line", keyword=keyword, author=photo.author, url=photo.author_url,
+                               unsplash=UNSPLASH_LINK))
+            st.caption(tr("credits_note"))
+    with st.expander(tr("json_header")):
         st.json(deck.model_dump(exclude_none=True))
 else:
-    st.subheader("Example")
-    st.caption(
-        "This is a built-in sample presentation drawn in the selected style and theme. "
-        "Fill in the form on the left to generate your own."
-    )
+    st.subheader(tr("example"))
+    st.caption(tr("example_caption"))
     show_slides(sample_preview(selected_style, selected_theme))

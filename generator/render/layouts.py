@@ -351,17 +351,22 @@ LAYOUTS = {
 def build_specs(deck, style, palette, image_keys, credits=None):
     """Turn a whole Deck into slide descriptions: the title slide plus one per content slide.
 
-    credits maps picture keys to an author line; it goes into the speaker notes of the
-    slides that show that picture.
+    Speaker notes are the slide's own notes, followed by the photo credit (credits maps
+    picture keys to an author line) on slides that show a photo.
     """
     credits = credits or {}
     total = len(deck.slides) + 1
     ctx = Ctx(palette=palette, style=style, number=1, total=total, deck_title=deck.title, images=set(image_keys))
-    specs = [style.cover(ctx, "title", deck.title, deck.subtitle)]
+    cover = style.cover(ctx, "title", deck.title, deck.subtitle)
+    cover.notes = deck.notes or ""
+    specs = [cover]
     for i, slide in enumerate(deck.slides):
         ctx.number = i + 2
         spec = LAYOUTS[slide.type](ctx, slide)
-        if _image_key(ctx, slide) and slide.type in ("bullets", "image"):
-            spec.notes = credits.get(slide.image_keyword, "")
+        # speaker notes: what to say, then (if the slide shows a photo) who took the photo
+        notes = [slide.notes] if slide.notes else []
+        if _image_key(ctx, slide) and slide.type in ("bullets", "image") and credits.get(slide.image_keyword):
+            notes.append(credits[slide.image_keyword])
+        spec.notes = "\n\n".join(notes)
         specs.append(spec)
     return specs

@@ -31,6 +31,12 @@ def test_document_is_passed_inside_tags_and_cut_to_the_limit():
     assert "Based on the document materials" in prompt
 
 
+def test_speaker_notes_can_be_switched_off():
+    assert "SPEAKER NOTES" in build_prompt("x", "", "💼 Professional", "Balanced", "", 5)
+    off = build_prompt("x", "", "💼 Professional", "Balanced", "", 5, speaker_notes=False)
+    assert "SPEAKER NOTES" not in off and 'Leave every "notes" field empty.' in off
+
+
 def test_short_decks_get_no_section_slides():
     assert 'Do not use "section"' in build_prompt("x", "", "💼 Professional", "Balanced", "", 3)
     assert 'Do not use "section"' not in build_prompt("x", "", "💼 Professional", "Balanced", "", 10)

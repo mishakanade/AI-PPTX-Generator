@@ -41,3 +41,14 @@ def test_preview_has_one_snippet_per_slide_and_shows_the_photo():
     slides = build_preview(SAMPLE_DECK, "soft", "Dark Modern", {SAMPLE_IMAGE: sample_photo_url()})
     assert len(slides) == len(SAMPLE_DECK.slides) + 1
     assert any("data:image/jpeg;base64," in s for s in slides)
+
+
+def test_speaker_notes_come_before_the_photo_credit():
+    deck = SAMPLE_DECK.model_copy(deep=True)
+    deck.notes = "Welcome everyone."
+    deck.slides[0].notes = "Cities are growing fast."            # this slide has the sample photo
+    data = build_pptx(deck, "minimal", "Corporate Blue", {SAMPLE_IMAGE: sample_photo()},
+                      credits={SAMPLE_IMAGE: "Photo by Jane Doe on Unsplash"})
+    slides = Presentation(BytesIO(data)).slides
+    assert slides[0].notes_slide.notes_text_frame.text == "Welcome everyone."
+    assert slides[1].notes_slide.notes_text_frame.text == "Cities are growing fast.\n\nPhoto by Jane Doe on Unsplash"

@@ -76,12 +76,16 @@ class Slide(BaseModel):
     quote: Optional[str] = None
     author: Optional[str] = None
     table: Optional[Table] = None
+    notes: Optional[str] = Field(
+        default=None, description="What the presenter says on this slide: 2-4 sentences, not a copy of the slide"
+    )
 
 
 class Deck(BaseModel):
     title: str
     subtitle: str
     slides: List[Slide]
+    notes: Optional[str] = Field(default=None, description="What the presenter says on the title slide")
 
 
 class ContentError(Exception):
@@ -126,6 +130,7 @@ def _normalize_slide(slide):
         "title": _clean(slide.title) or "Slide",
         "subtitle": _clean(slide.subtitle) or None,
         "image_keyword": _clean(slide.image_keyword) or None,
+        "notes": _clean(slide.notes) or None,
     }
     kind = slide.type
 
@@ -188,6 +193,7 @@ def normalize_deck(deck):
     return Deck(
         title=_clean(deck.title) or "Presentation",
         subtitle=_clean(deck.subtitle),
+        notes=_clean(deck.notes) or None,
         slides=[_normalize_slide(slide) for slide in deck.slides],
     )
 

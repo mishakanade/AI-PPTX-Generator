@@ -75,3 +75,10 @@ def test_unusable_answers_raise_content_error(raw):
 def test_answer_without_slides_raises_content_error():
     with pytest.raises(ContentError):
         parse_deck(deck_json())
+
+
+def test_notes_survive_the_fallback_to_bullets():
+    deck = parse_deck(json.dumps({"title": "T", "subtitle": "S", "notes": " Hello ", "slides": [
+        {"type": "cards", "title": "A", "cards": [{"heading": "H", "text": "T"}], "notes": "Say this."}]}))
+    assert deck.notes == "Hello"
+    assert deck.slides[0].type == "bullets" and deck.slides[0].notes == "Say this."

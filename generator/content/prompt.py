@@ -16,7 +16,8 @@ EXAMPLE_ANSWER = {
     "subtitle": "One-line subtitle",
     "slides": [
         {"type": "bullets", "title": "Slide Title",
-         "bullets": ["First point", "Second point", "Third point"], "image_keyword": "mountain lake sunrise"},
+         "bullets": ["First point", "Second point", "Third point"], "image_keyword": "mountain lake sunrise",
+         "notes": "Two to four sentences the presenter says while this slide is shown."},
         {"type": "stats", "title": "Slide Title",
          "stats": [{"value": "73%", "label": "what this figure means"}, {"value": "4.2M", "label": "what this figure means"}]},
         {"type": "cards", "title": "Slide Title",
@@ -26,10 +27,11 @@ EXAMPLE_ANSWER = {
 }
 
 
-def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides):
+def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, speaker_notes=True):
     """Assemble the prompt from everything the user chose in the form.
 
     tone and text_amount are keys of TONE_PRESETS / TEXT_AMOUNT_PRESETS.
+    speaker_notes: ask the model to write what the presenter should say on each slide.
     """
     tone_description = TONE_PRESETS[tone]
     amount = TEXT_AMOUNT_PRESETS[text_amount]
@@ -80,6 +82,15 @@ def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides):
         'matches the main subject of that slide (for example "space shuttle launch" or "steam locomotive"). '
         'Never use abstract words like "history", "era", "innovation" or "concept".',
     ]
+    if speaker_notes:
+        lines += [
+            "",
+            'SPEAKER NOTES: fill "notes" for every slide and the top-level "notes" for the title slide: '
+            "2-4 natural spoken sentences the presenter can say. Add context, an example or a transition "
+            "to the next slide; do not just repeat the text of the slide.",
+        ]
+    else:
+        lines += ["", 'Leave every "notes" field empty.']
 
     if commentary.strip():
         lines += [

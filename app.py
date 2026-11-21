@@ -108,6 +108,10 @@ with st.sidebar:
             "Additional wishes (optional)", placeholder="Focus on the environmental impact"
         )
         num_slides = st.slider("Number of slides", min_value=2, max_value=15, value=6, step=1)
+        speaker_notes = st.checkbox(
+            "Write speaker notes", value=True,
+            help="What to say on each slide. Saved in the notes of the PowerPoint file.",
+        )
         submit_button = st.form_submit_button("🚀 Generate presentation", type="primary", width="stretch")
     st.caption("The design on the right can be changed at any time, even after generation.")
 
@@ -164,6 +168,7 @@ if submit_button:
             text_amount=selected_text_amount,
             commentary=additional_commentary,
             num_slides=num_slides,
+            speaker_notes=speaker_notes,
         )
 
         # Forget the previous presentation before making a new one
@@ -240,6 +245,14 @@ if "pptx_bytes" in st.session_state:
         "(for example if a font is not installed on this computer)."
     )
 
+    slides_with_notes = [("Title slide", deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
+    if any(notes for _, notes in slides_with_notes):
+        with st.expander("🎤 Speaker notes"):
+            for number, (title, notes) in enumerate(slides_with_notes, 1):
+                if notes:
+                    st.markdown(f"**{number}. {title}**")
+                    st.write(notes)
+            st.caption("The notes are also saved in the .pptx file: PowerPoint shows them in presenter view.")
     if photos:
         with st.expander("📷 Photo credits"):
             for keyword, photo in photos.items():

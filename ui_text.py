@@ -59,6 +59,11 @@ TEXTS = {
         "num_slides": "Number of slides",
         "speaker_notes": "Write speaker notes",
         "speaker_notes_help": "What to say on each slide. Saved in the notes of the PowerPoint file.",
+        "data_file": "Your data for charts (optional)",
+        "data_file_help": "A CSV or Excel table: the first column holds labels, the others numbers. "
+                          "Charts are drawn from these numbers exactly; the AI only chooses and explains them.",
+        "data_error": "⚠️ {reason} The data was not used.",
+        "data_loaded": "📊 Data: {tables} table(s), {charts} chart(s) prepared from your numbers.",
         "goal": "Purpose of the talk",
         "goal_help": "Sets the storyline: how the slides are ordered and what each one has to do.",
         "audience": "Audience (optional)",
@@ -284,6 +289,11 @@ TEXTS = {
         "num_slides": "Количество слайдов",
         "speaker_notes": "Писать заметки докладчика",
         "speaker_notes_help": "Что говорить на каждом слайде. Сохраняется в заметках файла PowerPoint.",
+        "data_file": "Ваши данные для диаграмм (необязательно)",
+        "data_file_help": "Таблица CSV или Excel: в первом столбце подписи, в остальных числа. "
+                          "Диаграммы строятся точно по этим числам; ИИ только выбирает их и объясняет.",
+        "data_error": "⚠️ {reason} Данные не использованы.",
+        "data_loaded": "📊 Данные: таблиц — {tables}, подготовлено диаграмм — {charts}.",
         "goal": "Цель выступления",
         "goal_help": "Задаёт схему повествования: в каком порядке идут слайды и что каждый должен сделать.",
         "audience": "Аудитория (необязательно)",

@@ -504,3 +504,27 @@ def test_quality_fix_by_copy_and_paste(fakes):
     app.button(key="fix_chat_apply").click().run()
     assert not app.exception and not app.error
     assert app.session_state["deck"].slides[0].title == "Change is now measured in months"
+
+
+def test_uploaded_data_becomes_charts_with_the_real_numbers(fakes, monkeypatch):
+    from generator.content.schema import parse_deck
+    answer = {"title": "Финансы", "subtitle": "", "slides": [
+        {"type": "chart", "title": "Выручка растёт третий год подряд", "subtitle": "+78% к 2019", "data_ref": "D1",
+         "chart": {"kind": "pie", "categories": ["x", "y"], "series": [{"name": "fake", "values": [1, 2]}]}}]}
+    seen = {}
+
+    def fake_generate(prompt, max_slides=None, **kwargs):
+        seen["prompt"] = prompt
+        return parse_deck(json.dumps(answer, ensure_ascii=False))
+
+    monkeypatch.setattr(llm, "generate_deck", fake_generate)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Финансы")
+    csv = "Год;Выручка, млн ₽\n2019;120,5\n2020;98\n2021;140\n2022;214,6\n".encode()
+    app.file_uploader(key="data_file").set_value(("finance.csv", csv, "text/csv"))
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    assert "PREPARED CHARTS" in seen["prompt"] and "2022,214.6" in seen["prompt"]
+    assert any("Data: 1 table(s)" in i.value for i in app.info)
+    chart = app.session_state["deck"].slides[0].chart
+    assert chart.kind == "line" and chart.series[0].values == [120.5, 98.0, 140.0, 214.6]

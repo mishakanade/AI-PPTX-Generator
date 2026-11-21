@@ -7,6 +7,7 @@ import streamlit as st
 
 import ui_text
 from generator.content import llm
+from generator.content.data import DataError, bind_data_charts, chart_options, describe_for_prompt, read_tables
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.prompt import MAX_DOC_CHARS, build_outline_prompt, build_prompt, build_review_prompt
 from generator.content.quality import check_deck, describe_for_model
@@ -16,8 +17,39 @@ from generator.images import unsplash
 from interface.common import current_language, forget_presentation, safe_file_name, tr
 
 
+def bind(deck):
+    """Put the user's real numbers into every chart slide that names a prepared chart.
+
+    Done last, right before a deck is kept, so that whatever the model did to the numbers
+    on the way (writing, the editor's pass, a fix), the charts show the user's data.
+    """
+    data = st.session_state.get("data")
+    return bind_data_charts(deck, data["options"]) if data else bind_data_charts(deck, [])
+
+
+def data_text():
+    data = st.session_state.get("data")
+    return data["text"] if data else None
+
+
+def load_data(form):
+    """Read the uploaded table, prepare the chart menu and keep both in the session."""
+    st.session_state.pop("data", None)
+    if not form.data_file:
+        return
+    try:
+        tables = read_tables(form.data_file.name, form.data_file.getvalue())
+    except DataError as e:
+        st.warning(tr("data_error", reason=e))
+        return
+    options = chart_options(tables)
+    st.session_state["data"] = {"text": describe_for_prompt(tables, options), "options": options}
+    st.info(tr("data_loaded", tables=len(tables), charts=len(options)))
+
+
 def store_deck(deck, topic, settings, conn):
     """Keep a freshly written deck and its photos in the session; the file is drawn later."""
+    deck = bind(deck)
     photos, photo_warnings = unsplash.fetch_photos(unsplash.keywords_for(deck), client_id=conn.unsplash_key)
     st.session_state["deck"] = deck
     st.session_state["photos"] = photos
@@ -34,6 +66,7 @@ def brief(settings):
 
 def review(deck, settings, conn):
     """The editor's pass: fix what the automatic check found. Returns the better version."""
+    deck = bind(deck)          # the check and the editor see the real chart numbers
     issues = check_deck(deck, settings["text_amount"], settings["speaker_notes"])
     if not issues:
         return deck
@@ -80,12 +113,13 @@ def handle_submit(form, conn):
         return
 
     forget_presentation()          # the previous presentation is replaced by the new one
+    load_data(form)
     plan_request = {"topic": form.topic, "doc_text": doc_text, "commentary": form.commentary,
                     "settings": form.settings}
 
     if form.outline_first:
         outline_prompt = build_outline_prompt(form.topic, doc_text, form.tone, form.commentary, form.num_slides,
-                                              for_chat=conn.is_chat, **brief(form.settings))
+                                              for_chat=conn.is_chat, data_text=data_text(), **brief(form.settings))
         if conn.is_chat:
             st.session_state["chat_request"] = {"kind": "outline", "prompt": outline_prompt, **plan_request}
             return
@@ -102,7 +136,7 @@ def handle_submit(form, conn):
     prompt = build_prompt(topic=form.topic, doc_text=doc_text, tone=form.tone, text_amount=form.text_amount,
                           commentary=form.commentary, num_slides=form.num_slides,
                           speaker_notes=form.speaker_notes, for_chat=conn.is_chat,
-                          minutes=form.minutes or None, **brief(form.settings))
+                          minutes=form.minutes or None, data_text=data_text(), **brief(form.settings))
     if conn.is_chat:
         # copy & paste: the request is shown by chat_panel(); the deck is built when the answer comes back
         st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": form.topic,
@@ -203,7 +237,7 @@ def outline_panel(conn):
         topic=request["topic"], doc_text=request["doc_text"], tone=settings["tone"],
         text_amount=settings["text_amount"], commentary=request["commentary"], num_slides=len(edited),
         speaker_notes=settings["speaker_notes"], for_chat=conn.is_chat, outline=approved,
-        minutes=settings.get("minutes"), **brief(settings),
+        minutes=settings.get("minutes"), data_text=data_text(), **brief(settings),
     )
     if conn.is_chat:
         st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": request["topic"],

@@ -30,6 +30,9 @@ The project is in alpha and is built solo, so expect changes.
 - **13 slide types.** The model picks the type that suits each slide: bullets, full-screen photo,
   two columns, cards, key numbers, chart, quote, key statement, timeline, table, agenda,
   section divider and closing takeaways.
+- **Your data, exact charts.** Upload a CSV or Excel table: the app prepares charts from it
+  and the AI only chooses which ones to show and what they mean. The numbers in the charts come
+  from your table, never from the model.
 - **Native, editable charts.** Column, bar, line and doughnut charts are real PowerPoint charts,
   so the data can be edited after download.
 - **5 design styles × 32 colour themes, or your own colours.** Minimal, Editorial, Corporate,
@@ -149,6 +152,7 @@ generator/
     editing.py               slides as editable text and back
     storytelling.py          purposes, storylines and writing rules the prompts apply
     quality.py               the automatic content checks and the quality score
+    data.py                  the user's tables: reading, the chart menu, filling charts with real numbers
   design/
     themes.py                the 32 colour palettes
     colors.py                derives card, line, text-on-accent and chart colours from a palette

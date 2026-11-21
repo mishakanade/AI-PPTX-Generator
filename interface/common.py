@@ -113,7 +113,7 @@ def secret(name):
 def forget_presentation():
     """Remove the current presentation and everything that belongs to it from the session."""
     for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design",
-                "chat_request", "regen_chat_prompt", "outline", "outline_request"):
+                "chat_request", "regen_chat_prompt", "outline", "outline_request", "data"):
         st.session_state.pop(key, None)
 
 

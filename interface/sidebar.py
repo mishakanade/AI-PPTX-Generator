@@ -28,6 +28,7 @@ class ContentForm:
     num_slides: int
     speaker_notes: bool
     outline_first: bool
+    data_file: object = None
     goal: str = DEFAULT_GOAL
     audience: str = ""
     minutes: int = 0
@@ -103,6 +104,8 @@ def content_form():
         with st.form("generation_form"):
             topic = st.text_input(tr("topic"), placeholder=tr("topic_placeholder"), key="topic")
             uploaded_file = st.file_uploader(tr("document"), type=["txt", "pdf", "docx"], key="document")
+            data_file = st.file_uploader(tr("data_file"), type=["csv", "xlsx"], key="data_file",
+                                         help=tr("data_file_help"))
             goal = st.selectbox(
                 tr("goal"), options=list(GOALS), key="goal", help=tr("goal_help"),
                 format_func=lambda key: ui_text.pick(ui_text.GOALS, lang, key),
@@ -134,7 +137,7 @@ def content_form():
     if error:
         st.error(tr("project_error", error=error))
     return ContentForm(submitted, topic, uploaded_file, tone, text_amount, commentary, num_slides,
-                       speaker_notes, outline_first, goal, audience, int(minutes or 0), auto_review)
+                       speaker_notes, outline_first, data_file, goal, audience, int(minutes or 0), auto_review)
 
 
 def open_project():

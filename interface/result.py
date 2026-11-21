@@ -125,7 +125,7 @@ def _issue_text(issue):
 
 
 def _replace_deck(deck):
-    st.session_state["deck"] = deck
+    st.session_state["deck"] = generation.bind(deck)
     st.session_state.pop("rendered_design", None)    # forces render() to draw again
     st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
 
@@ -243,7 +243,8 @@ def _regenerate_section(deck, conn):
         # the slide is written with the settings of the original generation
         settings = current_settings()
         prompt = build_slide_prompt(deck, index, wish, settings["tone"], settings["text_amount"],
-                                    settings["speaker_notes"], for_chat=conn.is_chat, **generation.brief(settings))
+                                    settings["speaker_notes"], for_chat=conn.is_chat,
+                                    data_text=generation.data_text(), **generation.brief(settings))
         slide = _slide_by_chat(prompt, version, index) if conn.is_chat else _slide_by_api(prompt, conn)
     if slide is None:
         return
@@ -254,7 +255,7 @@ def _regenerate_section(deck, conn):
         photos.update(found)
     slides = list(deck.slides)
     slides[index] = slide
-    st.session_state["deck"] = deck.model_copy(update={"slides": slides})
+    st.session_state["deck"] = generation.bind(deck.model_copy(update={"slides": slides}))
     st.session_state.pop("rendered_design", None)    # forces render() to draw again
     st.session_state.pop("regen_chat_prompt", None)
     st.session_state["edit_version"] = version + 1     # the edit form shows the new text

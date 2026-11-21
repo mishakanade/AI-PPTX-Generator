@@ -93,6 +93,9 @@ class Slide(BaseModel):
     author: Optional[str] = None
     table: Optional[Table] = None
     chart: Optional[Chart] = None
+    data_ref: Optional[str] = Field(
+        default=None, description='Id of a prepared chart built from the user\'s data, e.g. "D1"; only when offered'
+    )
     notes: Optional[str] = Field(
         default=None, description="What the presenter says on this slide: 2-4 sentences, not a copy of the slide"
     )
@@ -206,6 +209,9 @@ def _normalize_slide(slide):
                     rows.append(TableRow(cells=cells))
             if len(rows) >= 2:
                 return Slide(**data, table=Table(headers=headers, rows=rows))
+    elif kind == "chart" and _clean(slide.data_ref):
+        # a chart from the user's data: its numbers are filled in later by data.bind_data_charts
+        return Slide(**data, data_ref=_clean(slide.data_ref).upper())
     elif kind == "chart" and slide.chart:
         chart = _normalize_chart(slide.chart)
         if chart:

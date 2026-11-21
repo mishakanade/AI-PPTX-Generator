@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def _read_key(name):
     """Return the key, or None when it is missing or still the placeholder from .env.example."""
     value = (os.getenv(name) or "").strip()
@@ -17,7 +18,13 @@ def _read_key(name):
 
 
 GEMINI_API_KEY = _read_key("GEMINI_API_KEY")
+OPENAI_API_KEY = _read_key("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = _read_key("ANTHROPIC_API_KEY")
 UNSPLASH_CLIENT_ID = _read_key("UNSPLASH_CLIENT_ID")
 
-# Tried in this order: if the first model is overloaded, the next one is used.
+# Gemini models, tried in this order: if the first one is overloaded, the next one is used.
 MODELS = ["gemini-3.8-flash", "gemini-3.7-flash"]
+
+# Default models of the other providers. The user can type another one in the app.
+OPENAI_MODEL = "gpt-6.2-astra"
+CLAUDE_MODEL = "claude-opus-5-5"

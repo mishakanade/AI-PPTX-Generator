@@ -55,7 +55,7 @@ def fake_model(monkeypatch):
     """Replace the real request with a list of scripted answers; records every call."""
     calls, script = [], []
 
-    def fake_ask(model, prompt, schema, api_key):
+    def fake_ask(provider, model, prompt, schema, api_key):
         calls.append((model, schema is not None))
         answer = script.pop(0)
         if isinstance(answer, Exception):
@@ -108,7 +108,7 @@ def test_overloaded_model_falls_back_to_the_next_one(fake_model):
 def test_the_users_key_is_used_instead_of_the_one_from_env(monkeypatch):
     keys = []
     monkeypatch.setattr(config, "GEMINI_API_KEY", "from-env")
-    monkeypatch.setattr(llm, "_ask", lambda model, prompt, schema, key: keys.append(key) or GOOD_ANSWER)
+    monkeypatch.setattr(llm, "_ask", lambda provider, model, prompt, schema, key: keys.append(key) or GOOD_ANSWER)
     llm.generate_deck("prompt")
     llm.generate_deck("prompt", api_key="typed-by-user")
     assert keys == ["from-env", "typed-by-user"]

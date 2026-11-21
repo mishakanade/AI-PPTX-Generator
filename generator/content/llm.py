@@ -34,6 +34,15 @@ def _ask(model, prompt, use_schema, api_key):
     return response.text
 
 
+def trim_slides(slides, limit):
+    """Cut a deck that came back longer than asked, keeping a closing slide at the end."""
+    if len(slides) <= limit:
+        return slides
+    if slides[-1].type == "closing" and limit > 1:
+        return slides[:limit - 1] + [slides[-1]]
+    return slides[:limit]
+
+
 def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None):
     """Ask Gemini for a presentation and return it as a checked Deck.
 
@@ -55,7 +64,7 @@ def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None):
             try:
                 deck = parse_deck(_ask(model, prompt, use_schema, api_key))
                 if max_slides:
-                    deck.slides = deck.slides[:max_slides]
+                    deck.slides = trim_slides(deck.slides, max_slides)
                 return deck
             except ContentError as e:
                 last_err = e              # the answer was unusable: simply ask again

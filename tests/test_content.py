@@ -75,6 +75,15 @@ def test_good_answer_is_returned_and_trimmed_to_the_requested_size(fake_model):
     assert len(deck.slides) == 3 and calls == [("model-a", True)]
 
 
+def test_trimming_a_long_deck_keeps_the_closing_slide(fake_model):
+    calls, script = fake_model
+    slides = [{"type": "bullets", "title": f"S{i}", "bullets": ["x"]} for i in range(6)]
+    slides.append({"type": "closing", "title": "End", "bullets": ["y"]})
+    script.append(json.dumps({"title": "T", "subtitle": "", "slides": slides}))
+    deck = llm.generate_deck("prompt", max_slides=4)
+    assert [s.title for s in deck.slides] == ["S0", "S1", "S2", "End"]
+
+
 def test_schema_rejection_retries_without_schema(fake_model):
     calls, script = fake_model
     script += [ApiError(400), GOOD_ANSWER]

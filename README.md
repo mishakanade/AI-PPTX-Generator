@@ -1,41 +1,142 @@
 # AI-PPTX-Generator
-An open code AI agent that generates presentations based on the user's input on the topic of the Presentation, chosen color preset, style and tone of the text and additional commentary.
-Works on this APIs: google-genai, Unsplash API
 
-This version is only in Alpha - the project will keep improving with time, as this is built in solo.
+An open-source app that turns a topic or a document into an editable PowerPoint presentation.
+Gemini writes the content, Unsplash supplies the photos, and a layout engine designs every
+slide in the style and colours you choose.
 
-The UI might be a little crooked and unappealing, this will be fixed in the next versions.
+It is a BYOK (Bring Your Own Key) application: you use your own API keys.
+The project is in alpha and is built solo, so expect changes.
 
-Its a BYOK (Bring Your Own Key) application. To get your api keys, go to those websites : 
-- https://unsplash.com/developers
-- https://aistudio.google.com/api-keys
+## What it does
 
-To run the project, follow these steps:
-  1. Git clone the project into a directory
-  2. CD into that directory (example): `cd C:\Users\Your Username\Documents\MyProject`
-  3. Install the libraries: `pip install -r requirements.txt`
-  4. Copy `.env.example` to a new file named `.env` and put your API keys into the variables "GEMINI_API_KEY" and "UNSPLASH_CLIENT_ID" (the Unsplash key is optional: without it presentations are generated without images)
-  5. Run this in the terminal: `python -m streamlit run app.py`
+- **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file
+  (up to about 60,000 characters are used). Choose the tone, the amount of text per slide
+  and the number of slides, and add your own wishes.
+- **13 slide types.** The model picks the type that suits each slide: bullets, full-screen photo,
+  two columns, cards, key numbers, chart, quote, key statement, timeline, table, agenda,
+  section divider and closing takeaways.
+- **Native, editable charts.** Column, bar, line and doughnut charts are real PowerPoint charts,
+  so the data can be edited after download.
+- **5 design styles × 32 colour themes.** Minimal, Editorial, Corporate, Soft and Bold, each
+  working with every palette. Slides of the same type alternate between layout variants
+  (photo on the left or right, card grid or numbered list, and so on).
+- **Text that fits.** The engine measures text before placing it, so titles and paragraphs
+  shrink or grow to fit their space instead of overlapping.
+- **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
+  PowerPoint's presenter view. Photo credits are added to the notes as well.
+- **Instant redesign.** After generation, pick another style or theme: the file is redrawn
+  with the same content, without a new request to Gemini.
+- **Preview in the browser** before you download.
 
-Supported documents: TXT, PDF and DOCX. After a presentation is generated you can switch the design theme, and the file is rebuilt with the same content without a new request to Gemini.
+## Getting started
+
+1. Get the API keys:
+   - Gemini (required): https://aistudio.google.com/api-keys
+   - Unsplash (optional, for photos): https://unsplash.com/developers
+2. Clone the project and open its folder:
+   ```bash
+   git clone https://github.com/mishakanade/AI-PPTX-Generator.git
+   cd AI-PPTX-Generator
+   ```
+3. Install the libraries (Python 3.11 or newer):
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy `.env.example` to a new file named `.env` and put your keys into
+   `GEMINI_API_KEY` and `UNSPLASH_CLIENT_ID`. Without the Unsplash key the app still works,
+   just without photos.
+5. Start the app:
+   ```bash
+   python -m streamlit run app.py
+   ```
+
+## How it works
+
+```
+topic / document
+      │
+      ▼
+content/prompt.py   builds the request: slide types, text limits, tone, language
+      │
+      ▼
+content/llm.py      asks Gemini for JSON in a strict schema, retries and falls back on failures
+      │
+      ▼
+content/schema.py   checks the answer and repairs it, so every slide can be drawn
+      │
+      ▼
+images/unsplash.py  finds one distinct photo per slide, in parallel
+      │
+      ▼
+render/layouts.py   one layout per slide type; asks the style how cards, titles and covers look
+      │
+      ├──▶ render/pptx_backend.py   draws the slides into the .pptx file
+      └──▶ render/html_backend.py   draws the same slides as HTML for the preview
+```
+
+Layouts do not draw directly. They describe each slide as a list of simple shapes
+(boxes, text blocks, pictures, charts) measured in inches, and two painters draw that same
+description: one into PowerPoint, one into the browser. That is why the preview matches the file.
 
 ## Project structure
 
 ```
-app.py                      Streamlit interface: the form, messages, download button
+app.py                       Streamlit interface: form, design picker, preview, download
 generator/
-  config.py                 API keys and model names
+  config.py                  API keys and model names
   content/
-    presets.py              tone and text-amount presets
-    prompt.py               builds the request text for Gemini
-    llm.py                  sends the request, retries on failures, parses the answer
-    documents.py            reads text from TXT / PDF / DOCX
+    presets.py               tone and text-amount presets
+    prompt.py                builds the request for Gemini
+    llm.py                   sends it, retries, falls back to plain JSON if the schema is rejected
+    schema.py                slide types and fields; validation and repair of the answer
+    documents.py             reads TXT / PDF / DOCX
   design/
-    themes.py               colour palettes
+    themes.py                the 32 colour palettes
+    colors.py                derives card, line, text-on-accent and chart colours from a palette
+    styles.py                the 5 design styles
+    sample_deck.py           built-in example presentation (style previews, tests)
   images/
-    unsplash.py             finds and downloads pictures
+    unsplash.py              photo search, download and credits
   render/
-    pptx_builder.py         turns the content + theme + pictures into a .pptx file
+    primitives.py            the shapes a slide is described with
+    textfit.py               text measurement: line wrapping, shrink-to-fit
+    font_metrics.json        character widths of Calibri, Arial and Georgia
+    layout_tools.py          shared helpers for layouts and styles
+    layouts.py               one layout function per slide type, with variants
+    builder.py               entry point: content + style + theme + photos → slides
+    pptx_backend.py          draws slides into a .pptx file
+    html_backend.py          draws slides as HTML for the preview
+tests/                       automated tests (see below)
+tools/
+  render_samples.py          saves the example deck in every style to samples/
+  build_font_metrics.py      regenerates font_metrics.json
+.streamlit/config.toml       look of the interface
 ```
 
-How a presentation is made: `app.py` collects the form → `prompt.py` builds the request → `llm.py` gets the slide structure from Gemini as JSON → `unsplash.py` downloads a picture for each slide → `pptx_builder.py` builds the file.
+## Development
+
+Install the extra tools and run the tests (about 5 seconds, no API keys needed):
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+The tests check, among other things, that on every slide type, in every style, text and
+photos stay on the slide, every text fits its box and no texts overlap. They also run on
+GitHub for every push.
+
+To look at the designs without API keys, save the example deck in every style:
+
+```bash
+python tools/render_samples.py --theme "Dark Modern"
+```
+
+Add `--stress` for a deck of deliberately long texts, and `--pdf` to also get PDF files
+(needs LibreOffice).
+
+### Adding a design style
+
+Subclass `Style` in `generator/design/styles.py`, override what should look different
+(fonts, `frame`, `card`, `cover`, decorations) and add it to `STYLES`. It appears in the
+app automatically, and the tests check it like the others.

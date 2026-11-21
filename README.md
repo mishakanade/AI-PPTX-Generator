@@ -44,6 +44,7 @@ The project is in alpha and is built solo, so expect changes.
   your own picture, or remove it. Photos carry alternative text for screen readers.
 - **Save and reopen projects.** One `.project.json` file keeps the text, photos, style and
   colours, so you can come back later, restyle and download again without asking the AI.
+- **PDF too**, where LibreOffice is installed: a "Make a PDF" button appears next to the download.
 - **Preview in the browser** before you download.
 - **Interface in English or Russian**, chosen from the browser's language and switchable in
   the sidebar. The presentation itself is written in the language of your topic.
@@ -146,6 +147,7 @@ generator/
   images/
     unsplash.py              photo search, download and credits; the user's own pictures
   project.py                 saving a project to one JSON file and opening it again
+  export.py                  converting the .pptx to PDF with LibreOffice, if installed
   render/
     primitives.py            the shapes a slide is described with
     textfit.py               text measurement: line wrapping, shrink-to-fit

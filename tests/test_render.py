@@ -1,7 +1,10 @@
 """The finished outputs: the .pptx file and the HTML preview."""
 from io import BytesIO
 
+import pytest
 from pptx import Presentation
+
+from generator.export import find_soffice, to_pdf
 
 from generator.content.schema import Deck, Slide
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE, sample_photo, sample_photo_url
@@ -89,3 +92,17 @@ def test_transitions_are_written_into_every_slide():
     plain = build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {})
     assert b"transition" not in b"".join(
         s._element.xml.encode() for s in Presentation(BytesIO(plain)).slides)
+
+
+@pytest.mark.skipif(not find_soffice(), reason="LibreOffice is not installed")
+def test_pdf_export_has_a_page_per_slide():
+    import pypdf
+    pdf = to_pdf(build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {SAMPLE_IMAGE: sample_photo()}))
+    assert pdf.startswith(b"%PDF") and len(pypdf.PdfReader(BytesIO(pdf)).pages) == len(SAMPLE_DECK.slides) + 1
+
+
+def test_pdf_export_without_libreoffice_raises_a_clear_error(monkeypatch):
+    from generator import export
+    monkeypatch.setattr(export, "find_soffice", lambda: None)
+    with pytest.raises(export.ExportError):
+        export.to_pdf(b"x")

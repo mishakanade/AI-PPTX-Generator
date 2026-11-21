@@ -429,3 +429,20 @@ def test_plan_first_by_copy_and_paste(fakes):
     assert not app.exception and not app.error
     assert [s.title for s in app.session_state["deck"].slides] == ["План", "Гонка", "Цифры"]
     assert fakes["gemini"] == 0
+
+
+def test_pdf_button_only_where_libreoffice_exists(fakes, monkeypatch):
+    from generator import export
+    monkeypatch.setattr(export, "find_soffice", lambda: None)
+    app = generated_app(fakes)
+    assert not [b for b in app.button if b.key == "make_pdf"]
+
+    monkeypatch.setattr(export, "find_soffice", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(export, "to_pdf", lambda pptx: b"%PDF-fake")
+    app.run()
+    app.button(key="make_pdf").click().run()
+    assert not app.exception and not app.error
+    assert app.session_state["pdf"][1] == b"%PDF-fake"
+
+    app.selectbox(key="theme").set_value("Cyberpunk").run()        # a new design: the old PDF is not offered
+    assert [b for b in app.button if b.key == "make_pdf"]

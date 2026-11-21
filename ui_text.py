@@ -177,6 +177,11 @@ TEXTS = {
         # projects
         "save_project": "💾 Save project",
         "save_project_help": "Everything in one file: text, photos, style and colours. Open it later to keep working.",
+        "make_pdf": "📄 Make a PDF",
+        "make_pdf_help": "Made by LibreOffice on this computer. Fonts may differ slightly from PowerPoint.",
+        "download_pdf": "📥 Download PDF",
+        "pdf_working": "LibreOffice is making the PDF…",
+        "pdf_error": "❌ The PDF could not be made: {error}",
         "open_project": "📂 Open a saved project",
         "open_project_help": "A project saved here, or an AI chat's JSON answer saved as a file.",
         "project_error": "❌ Could not open this file: {error}",
@@ -358,6 +363,11 @@ TEXTS = {
 
         "save_project": "💾 Сохранить проект",
         "save_project_help": "Всё в одном файле: текст, фото, стиль и цвета. Откройте его позже, чтобы продолжить.",
+        "make_pdf": "📄 Сделать PDF",
+        "make_pdf_help": "Делается программой LibreOffice на этом компьютере. Шрифты могут немного отличаться от PowerPoint.",
+        "download_pdf": "📥 Скачать PDF",
+        "pdf_working": "LibreOffice делает PDF…",
+        "pdf_error": "❌ Не удалось сделать PDF: {error}",
         "open_project": "📂 Открыть сохранённый проект",
         "open_project_help": "Проект, сохранённый здесь, или JSON-ответ ИИ-чата, сохранённый в файл.",
         "project_error": "❌ Не удалось открыть файл: {error}",

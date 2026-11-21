@@ -1,9 +1,11 @@
 """Drawing the file and showing the result: download, preview, editing, photos, notes, credits."""
+import hashlib
 import uuid
 
 import streamlit as st
 
 import ui_text
+from generator import export
 from generator.content import llm
 from generator.content.editing import apply_edits, slide_to_text
 from generator.content.presets import TONE_PRESETS
@@ -77,6 +79,7 @@ def result_section(design, conn):
             key="save_project",
             help=tr("save_project_help"),
         )
+        _pdf_buttons()
     for warning in st.session_state.get("photo_warnings", []):
         st.warning(f"⚠️ {tr(warning)}")
 
@@ -86,6 +89,27 @@ def result_section(design, conn):
     _photos_section(deck, photos, conn)
     _regenerate_section(deck, conn)
     _notes_and_credits(deck, photos)
+
+
+def _pdf_buttons():
+    """PDF on request, only where LibreOffice is installed. A PDF made for an older version of
+    the file (before a design change or an edit) is not offered any more."""
+    if not export.find_soffice():
+        return
+    current = hashlib.sha1(st.session_state["pptx_bytes"]).hexdigest()
+    made = st.session_state.get("pdf")
+    if made and made[0] == current:
+        st.download_button(tr("download_pdf"), data=made[1], mime="application/pdf", width="stretch",
+                           file_name=st.session_state["file_name"].removesuffix(".pptx") + ".pdf", key="download_pdf")
+        return
+    if st.button(tr("make_pdf"), key="make_pdf", help=tr("make_pdf_help"), width="stretch"):
+        with st.spinner(tr("pdf_working")):
+            try:
+                st.session_state["pdf"] = (current, export.to_pdf(st.session_state["pptx_bytes"]))
+            except export.ExportError as e:
+                st.error(tr("pdf_error", error=e))
+                return
+        st.rerun()
 
 
 # ----- editing the text -------------------------------------------------------------------------

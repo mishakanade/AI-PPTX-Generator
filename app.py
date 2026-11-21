@@ -10,6 +10,7 @@ import streamlit as st
 
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
+from generator.content.editing import HINTS, TYPE_NAMES, apply_edits, slide_to_text
 from generator.content.llm import generate_deck
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
@@ -61,6 +62,44 @@ def show_swatches(theme):
 
 def select_style(style_key):
     st.session_state["style"] = style_key
+
+
+def edit_section(deck):
+    """A form to change the text of the slides or delete slides, then redraw without Gemini."""
+    # The widget keys include a version number: after a new generation or after applying edits
+    # the form starts again from the current content instead of keeping old typed values.
+    version = st.session_state.setdefault("edit_version", 0)
+    with st.expander("✏️ Edit slides"):
+        st.caption("Change titles and text, or delete slides. The file is redrawn without a new request "
+                   "to Gemini; photos and speaker notes are kept.")
+        with st.form(f"edit_form_{version}", border=False):
+            title = st.text_input("Presentation title", deck.title, key=f"e{version}_title")
+            subtitle = st.text_input("Subtitle", deck.subtitle, key=f"e{version}_subtitle")
+            edits = []
+            for i, slide in enumerate(deck.slides):
+                st.divider()
+                head, remove = st.columns([4, 1], vertical_alignment="center")
+                head.markdown(f"**Slide {i + 2} · {TYPE_NAMES[slide.type]}**")
+                delete = remove.checkbox("Delete", key=f"e{version}_{i}_delete")
+                slide_title = st.text_input("Title", slide.title, key=f"e{version}_{i}_title")
+                text = slide_to_text(slide)
+                body = st.text_area(
+                    "Text", text, key=f"e{version}_{i}_text", help=HINTS.get(slide.type),
+                    height=max(68, min(260, 26 * (text.count("\n") + 2))),
+                )
+                author = None
+                if slide.type == "quote":
+                    author = st.text_input("Author", slide.author or "", key=f"e{version}_{i}_author")
+                edits.append(None if delete else (slide_title, body, author))
+            applied = st.form_submit_button("Apply changes", type="primary")
+    if applied:
+        if all(edit is None for edit in edits):
+            st.warning("⚠️ At least one slide must stay.")
+            return
+        st.session_state["deck"] = apply_edits(deck, title, subtitle, edits)
+        st.session_state.pop("rendered_design", None)    # forces the redraw block to run
+        st.session_state["edit_version"] = version + 1
+        st.rerun()
 
 
 def safe_file_name(topic):
@@ -186,6 +225,7 @@ if submit_button:
                 st.session_state["photos"] = photos
                 st.session_state["photo_warnings"] = photo_warnings
                 st.session_state["file_name"] = safe_file_name(topic)
+                st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
                 status.update(label="Content is ready", state="complete")
             except Exception as e:
                 status.update(label="Generation failed", state="error")
@@ -244,6 +284,7 @@ if "pptx_bytes" in st.session_state:
         "The preview is drawn by the browser and may differ slightly from PowerPoint "
         "(for example if a font is not installed on this computer)."
     )
+    edit_section(deck)
 
     slides_with_notes = [("Title slide", deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
     if any(notes for _, notes in slides_with_notes):

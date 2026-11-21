@@ -26,6 +26,8 @@ The project is in alpha and is built solo, so expect changes.
   PowerPoint's presenter view. Photo credits are added to the notes as well.
 - **Instant redesign.** After generation, pick another style or theme: the file is redrawn
   with the same content, without a new request to Gemini.
+- **Edit before you download.** Change titles and text or delete slides in a simple form;
+  the file is redrawn without asking the model again.
 - **Preview in the browser** before you download.
 
 ## Getting started
@@ -90,6 +92,7 @@ generator/
     llm.py                   sends it, retries, falls back to plain JSON if the schema is rejected
     schema.py                slide types and fields; validation and repair of the answer
     documents.py             reads TXT / PDF / DOCX
+    editing.py               slides as editable text and back
   design/
     themes.py                the 32 colour palettes
     colors.py                derives card, line, text-on-accent and chart colours from a palette

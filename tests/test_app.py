@@ -66,3 +66,22 @@ def test_empty_form_asks_for_a_topic(fakes):
     app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
     assert any("enter a topic" in w.value for w in app.warning)
     assert fakes["gemini"] == 0
+
+
+def test_editing_changes_the_file_without_new_requests(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input[0].set_value("Космос")
+    app.button(key="FormSubmitter:generation_form-🚀 Generate presentation").click().run()
+    deck = app.session_state["deck"]
+    version = app.session_state["edit_version"]
+
+    app.text_input(key=f"e{version}_0_title").set_value("Совсем новый заголовок")
+    app.checkbox(key=f"e{version}_1_delete").check()
+    app.button(key=f"FormSubmitter:edit_form_{version}-Apply changes").click().run()
+    assert not app.exception and not app.error
+
+    edited = app.session_state["deck"]
+    assert edited.slides[0].title == "Совсем новый заголовок"
+    assert len(edited.slides) == len(deck.slides) - 1
+    assert app.session_state["edit_version"] == version + 1
+    assert fakes == {"gemini": 1, "unsplash": 1}

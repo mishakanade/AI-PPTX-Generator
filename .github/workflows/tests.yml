@@ -15,7 +15,5 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - name: Install fonts used by the layout checks
-        run: sudo apt-get install -y fonts-crosextra-carlito fonts-liberation
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q

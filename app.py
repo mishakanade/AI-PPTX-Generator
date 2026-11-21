@@ -8,6 +8,7 @@ Every text on the page comes from ui_text.py, in the language chosen in the side
 Widgets have fixed keys, so what the user typed survives a change of language.
 """
 import re
+import uuid
 
 import streamlit as st
 
@@ -23,7 +24,8 @@ from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
 from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import THEMES
-from generator.images.unsplash import fetch_photos, keywords_for
+from generator.images.unsplash import fetch_another, fetch_photos, keywords_for, own_photo
+from generator.project import load_project, save_project
 from generator.render.builder import build_pptx, build_preview, theme_colors
 
 PREVIEW_COLUMNS = 3
@@ -214,6 +216,109 @@ def store_deck(deck, topic, settings):
     st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
 
 
+def open_project():
+    """Called when a project file is chosen: restore the presentation, its design and settings."""
+    uploaded = st.session_state.get("project_file")
+    if not uploaded:
+        return
+    try:
+        project = load_project(uploaded.getvalue())
+    except ContentError as e:
+        st.session_state["project_error"] = str(e)
+        return
+    forget_presentation()
+    deck = project["deck"]
+    st.session_state.update(deck=deck, photos=project["photos"], photo_warnings=[],
+                            file_name=safe_file_name(deck.title), settings=project["settings"],
+                            style=project["style"])
+    theme = project["theme"]
+    if isinstance(theme, dict):
+        # custom colours: switch the theme list to "custom" and put the colours into the pickers
+        st.session_state["theme"] = CUSTOM_THEME
+        for key, color in theme.items():
+            st.session_state[f"custom_{key}"] = to_hex(tuple(color))
+    else:
+        st.session_state["theme"] = theme
+    st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
+
+
+def changed_photos(deck=None):
+    """After a photo change: store the deck if it changed, and make the file be drawn again."""
+    if deck is not None:
+        st.session_state["deck"] = deck
+    st.session_state.pop("rendered_design", None)
+    st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
+
+
+def set_slide_keyword(index, keyword):
+    deck = st.session_state["deck"]
+    slides = list(deck.slides)
+    slides[index] = slides[index].model_copy(update={"image_keyword": keyword})
+    return deck.model_copy(update={"slides": slides})
+
+
+def another_photo(index):
+    deck, photos = st.session_state["deck"], st.session_state["photos"]
+    keyword = deck.slides[index].image_keyword
+    used = {photo.photo_id for photo in photos.values() if photo.photo_id}
+    photo, warnings = fetch_another(keyword, used, client_id=unsplash_key)
+    if photo:
+        photos[keyword] = photo
+        changed_photos()
+    else:
+        st.session_state["photo_message"] = tr(warnings[0]) if warnings else tr("photo_none_found", keyword=keyword)
+
+
+def upload_photo(index, widget_key):
+    uploaded = st.session_state.get(widget_key)
+    if not uploaded:
+        return
+    try:
+        photo = own_photo(uploaded.getvalue())
+    except ValueError:
+        st.session_state["photo_message"] = tr("photo_not_image")
+        return
+    key = f"upload-{uuid.uuid4().hex[:8]}"     # own pictures get their own key: never searched on Unsplash
+    st.session_state["photos"][key] = photo
+    changed_photos(set_slide_keyword(index, key))
+
+
+def remove_photo(index):
+    changed_photos(set_slide_keyword(index, None))
+
+
+def photos_section(deck, photos):
+    """Per slide that can show a photo: its current picture and the ways to change it."""
+    version = st.session_state.get("edit_version", 0)
+    with st.expander(tr("photos_header")):
+        st.caption(tr("photos_caption"))
+        message = st.session_state.pop("photo_message", None)
+        if message:
+            st.warning(message)
+        for i, slide in enumerate(deck.slides):
+            if slide.type not in ("bullets", "image"):
+                continue
+            keyword = slide.image_keyword
+            photo = photos.get(keyword) if keyword else None
+            picture, controls = st.columns([1, 3], vertical_alignment="center")
+            with picture:
+                if photo:
+                    st.image(photo.preview_url, width="stretch")
+                else:
+                    st.caption(tr("no_photo"))
+            with controls:
+                st.markdown(f"**{i + 2}. {plain(slide.title)}**")
+                buttons = st.columns(2)
+                can_search = bool(keyword) and not keyword.startswith("upload-") and bool(unsplash_key)
+                buttons[0].button(tr("another_photo"), key=f"another_{version}_{i}", disabled=not can_search,
+                                  on_click=another_photo, args=(i,), width="stretch")
+                buttons[1].button(tr("remove_photo"), key=f"remove_{version}_{i}", disabled=not photo,
+                                  on_click=remove_photo, args=(i,), width="stretch")
+                widget_key = f"own_{version}_{i}"
+                st.file_uploader(tr("upload_photo"), type=["png", "jpg", "jpeg", "webp"], key=widget_key,
+                                 on_change=upload_photo, args=(i, widget_key), label_visibility="collapsed")
+
+
 def forget_presentation():
     for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design",
                 "chat_request", "regen_chat_prompt"):
@@ -329,6 +434,12 @@ with st.sidebar:
                                     key="speaker_notes")
         submit_button = st.form_submit_button(tr("generate"), type="primary", width="stretch", key="generate")
     st.caption(tr("design_hint"))
+    st.file_uploader(tr("open_project"), type=["json"], key="project_file", on_change=open_project,
+                     help=tr("open_project_help"))
+
+error = st.session_state.pop("project_error", None)
+if error:
+    st.error(tr("project_error", error=error))
 
 
 # ----- design: colours and style ------------------------------------------------------------
@@ -345,7 +456,10 @@ with theme_column:
         start = THEMES[next(iter(THEMES))]
         labels = {key: tr(f"colour_{key}") for key in ("bg", "title", "text", "accent")}
         picked = {
-            key: from_hex(column.color_picker(label, to_hex(tuple(start[key])), key=f"custom_{key}"))
+            # a colour already in the session (e.g. from an opened project) is used as it is
+            key: from_hex(column.color_picker(label, key=f"custom_{key}",
+                                              **({} if f"custom_{key}" in st.session_state
+                                                 else {"value": to_hex(tuple(start[key]))})))
             for column, (key, label) in zip(st.columns(4), labels.items())
         }
         selected_theme, changed = readable_theme(**picked)
@@ -462,7 +576,7 @@ if "deck" in st.session_state and st.session_state.get("rendered_design") != des
         st.session_state["pptx_bytes"] = build_pptx(
             deck, selected_style, selected_theme,
             images={key: photo.data for key, photo in photos.items()},
-            credits={key: photo.credit for key, photo in photos.items()},
+            credits={key: photo.credit for key, photo in photos.items() if photo.credit},
         )
         st.session_state["preview"] = build_preview(
             deck, selected_style, selected_theme,
@@ -493,12 +607,22 @@ if "pptx_bytes" in st.session_state:
             width="stretch",
             key="download",
         )
+        st.download_button(
+            label=tr("save_project"),
+            data=save_project(deck, photos, selected_style, selected_theme, st.session_state.get("settings")),
+            file_name=st.session_state["file_name"].removesuffix(".pptx") + ".project.json",
+            mime="application/json",
+            width="stretch",
+            key="save_project",
+            help=tr("save_project_help"),
+        )
     for warning in st.session_state.get("photo_warnings", []):
         st.warning(f"⚠️ {tr(warning)}")
 
     show_slides(st.session_state["preview"])
     st.caption(tr("preview_note"))
     edit_section(deck)
+    photos_section(deck, photos)
     regenerate_section(deck)
 
     slides_with_notes = [(tr("title_slide"), deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
@@ -509,9 +633,10 @@ if "pptx_bytes" in st.session_state:
                     st.markdown(f"**{number}. {plain(title)}**")
                     st.markdown(plain(notes))
             st.caption(tr("notes_note"))
-    if photos:
+    unsplash_photos = {keyword: photo for keyword, photo in photos.items() if photo.author}
+    if unsplash_photos:
         with st.expander(tr("credits_header")):
-            for keyword, photo in photos.items():
+            for keyword, photo in unsplash_photos.items():
                 st.markdown(tr("credit_line", keyword=plain(keyword), author=plain(photo.author), url=photo.author_url,
                                unsplash=UNSPLASH_LINK))
             st.caption(tr("credits_note"))

@@ -20,6 +20,7 @@ from generator import config
 
 API_URL = "https://api.unsplash.com"
 CANDIDATES_PER_KEYWORD = 5
+MORE_CANDIDATES = 20    # for "another photo": a longer list to choose an unused one from
 PREVIEW_WIDTH = 640     # pixels; previews are embedded into the page, so they must be small
 MAX_WORKERS = 4         # how many requests run at the same time
 
@@ -28,12 +29,22 @@ MAX_WORKERS = 4         # how many requests run at the same time
 class Photo:
     data: bytes          # the image file that goes into the .pptx
     preview_url: str     # a small copy as a data: URL, for the preview in the browser
-    author: str
-    author_url: str
+    author: str = ""     # photographer on Unsplash; empty for a picture the user uploaded
+    author_url: str = ""
+    photo_id: str = ""   # Unsplash id, so that "another photo" never returns the same one
 
     @property
     def credit(self):
-        return f"Photo by {self.author} on Unsplash"
+        """The attribution line Unsplash asks for, or "" for the user's own pictures."""
+        return f"Photo by {self.author} on Unsplash" if self.author else ""
+
+
+def own_photo(data):
+    """A picture the user uploaded. Raises ValueError if the bytes are not an image."""
+    try:
+        return Photo(data=data, preview_url=make_preview(data))
+    except Exception as e:
+        raise ValueError("not an image") from e
 
 
 class UnsplashLimitError(Exception):
@@ -45,11 +56,11 @@ def _headers(key):
     return {"Authorization": f"Client-ID {key}", "Accept-Version": "v1"}
 
 
-def _search(client, keyword, key):
+def _search(client, keyword, key, per_page=CANDIDATES_PER_KEYWORD):
     """Return candidate photos for a keyword: a list of dicts from the Unsplash API."""
     response = client.get(
         f"{API_URL}/search/photos",
-        params={"query": keyword.strip(), "per_page": CANDIDATES_PER_KEYWORD, "orientation": "landscape"},
+        params={"query": keyword.strip(), "per_page": per_page, "orientation": "landscape"},
         headers=_headers(key),
     )
     if response.status_code in (401, 403):
@@ -58,7 +69,7 @@ def _search(client, keyword, key):
     return response.json().get("results", [])
 
 
-def _make_preview(data):
+def make_preview(data):
     """Check that the bytes are a real image and return a small JPEG copy as a data: URL."""
     image = Image.open(BytesIO(data))
     image.load()                      # raises an error if the file is damaged
@@ -85,9 +96,10 @@ def _download(client, candidate, key):
         response.raise_for_status()
         photo = Photo(
             data=response.content,
-            preview_url=_make_preview(response.content),
+            preview_url=make_preview(response.content),
             author=candidate["user"]["name"],
             author_url=candidate["user"]["links"]["html"] + "?utm_source=ai_pptx_generator&utm_medium=referral",
+            photo_id=candidate["id"],
         )
     except Exception:
         return None
@@ -142,3 +154,26 @@ def keywords_for(deck):
     """The search phrases of all slides of a deck that can show a photo."""
     return [slide.image_keyword for slide in deck.slides
             if slide.type in ("bullets", "image") and slide.image_keyword]
+
+
+def fetch_another(keyword, exclude_ids, client_id=None):
+    """A different photo for the keyword than the ones in exclude_ids, or None.
+
+    Returns (photo, warnings) like fetch_photos.
+    """
+    key = client_id or config.UNSPLASH_CLIENT_ID
+    if not key or not keyword:
+        return None, []
+    with httpx.Client(timeout=10, follow_redirects=True) as client:
+        try:
+            candidates = _search(client, keyword, key, per_page=MORE_CANDIDATES)
+        except UnsplashLimitError:
+            return None, ["unsplash_limit"]
+        except Exception:
+            return None, []
+        for candidate in candidates:
+            if candidate["id"] not in exclude_ids:
+                photo = _download(client, candidate, key)
+                if photo:
+                    return photo, []
+    return None, []

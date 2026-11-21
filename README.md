@@ -35,6 +35,10 @@ The project is in alpha and is built solo, so expect changes.
 - **Edit before you download.** Change titles and text or delete slides in a simple form;
   the file is redrawn without asking the model again. Or let the AI rewrite a single slide,
   optionally with a wish such as "shorter" or "turn it into a chart".
+- **Your photos, your choice.** Swap any slide's photo for another one from Unsplash, upload
+  your own picture, or remove it. Photos carry alternative text for screen readers.
+- **Save and reopen projects.** One `.project.json` file keeps the text, photos, style and
+  colours, so you can come back later, restyle and download again without asking the AI.
 - **Preview in the browser** before you download.
 - **Interface in English or Russian**, chosen from the browser's language and switchable in
   the sidebar. The presentation itself is written in the language of your topic.
@@ -129,7 +133,8 @@ generator/
     styles.py                the 5 design styles
     sample_deck.py           built-in example presentation (style previews, tests)
   images/
-    unsplash.py              photo search, download and credits
+    unsplash.py              photo search, download and credits; the user's own pictures
+  project.py                 saving a project to one JSON file and opening it again
   render/
     primitives.py            the shapes a slide is described with
     textfit.py               text measurement: line wrapping, shrink-to-fit

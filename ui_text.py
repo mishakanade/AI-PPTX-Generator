@@ -148,6 +148,23 @@ TEXTS = {
         "regen_chat_show": "📋 Show the request",
         "regen_chat_apply": "Apply the answer",
 
+        # projects
+        "save_project": "💾 Save project",
+        "save_project_help": "Everything in one file: text, photos, style and colours. Open it later to keep working.",
+        "open_project": "📂 Open a saved project",
+        "open_project_help": "A project saved here, or an AI chat's JSON answer saved as a file.",
+        "project_error": "❌ Could not open this file: {error}",
+
+        # photos
+        "photos_header": "🖼️ Photos",
+        "photos_caption": "Swap a slide's photo for another one from Unsplash, upload your own picture, or remove it.",
+        "another_photo": "🔄 Another",
+        "upload_photo": "Your own picture",
+        "remove_photo": "✖ Remove",
+        "no_photo": "No photo",
+        "photo_not_image": "⚠️ This file is not a picture.",
+        "photo_none_found": "⚠️ No other photo was found for “{keyword}”.",
+
         # regenerating one slide
         "regen_header": "🔄 Regenerate one slide",
         "regen_caption": "The AI rewrites only the chosen slide, keeping the rest. Optionally say what to change.",
@@ -287,6 +304,21 @@ TEXTS = {
         ),
         "regen_chat_show": "📋 Показать запрос",
         "regen_chat_apply": "Применить ответ",
+
+        "save_project": "💾 Сохранить проект",
+        "save_project_help": "Всё в одном файле: текст, фото, стиль и цвета. Откройте его позже, чтобы продолжить.",
+        "open_project": "📂 Открыть сохранённый проект",
+        "open_project_help": "Проект, сохранённый здесь, или JSON-ответ ИИ-чата, сохранённый в файл.",
+        "project_error": "❌ Не удалось открыть файл: {error}",
+
+        "photos_header": "🖼️ Фотографии",
+        "photos_caption": "Замените фото на слайде другим с Unsplash, загрузите свою картинку или уберите фото.",
+        "another_photo": "🔄 Другое",
+        "upload_photo": "Своя картинка",
+        "remove_photo": "✖ Убрать",
+        "no_photo": "Без фото",
+        "photo_not_image": "⚠️ Этот файл не похож на картинку.",
+        "photo_none_found": "⚠️ Другого фото для «{keyword}» не нашлось.",
 
         "regen_header": "🔄 Пересоздать один слайд",
         "regen_caption": "ИИ перепишет только выбранный слайд, остальные останутся как есть. "

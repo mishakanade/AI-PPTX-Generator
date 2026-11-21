@@ -255,3 +255,77 @@ def test_copy_and_paste_mode_regenerates_one_slide(fakes):
     slides = app.session_state["deck"].slides
     assert slides[2].type == "statement" and [s.title for s in slides[:2]] == ["S0", "S1"]
     assert fakes["gemini"] == 0
+
+
+def generated_app(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Космос")
+    app.slider(key="num_slides").set_value(15)          # the test deck's photo slides come later
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    return app
+
+
+def photo_slide_index(app):
+    return next(i for i, s in enumerate(app.session_state["deck"].slides)
+                if s.type == "bullets" and s.image_keyword)
+
+
+def test_a_saved_project_opens_with_its_design(fakes):
+    from generator.project import save_project
+    app = generated_app(fakes)
+    custom = {"bg": (16, 32, 48), "title": (250, 250, 250), "text": (220, 220, 220), "accent": (255, 120, 0)}
+    raw = save_project(app.session_state["deck"], app.session_state["photos"], "soft", custom,
+                       {"tone": "💼 Professional", "text_amount": "Balanced", "speaker_notes": False})
+
+    fresh = AppTest.from_file(APP, default_timeout=60).run()
+    fresh.file_uploader(key="project_file").set_value(("deck.project.json", raw, "application/json")).run()
+    assert not fresh.exception and not fresh.error
+    assert fresh.session_state["deck"] == app.session_state["deck"]
+    assert fresh.session_state["style"] == "soft" and fresh.session_state["theme"] == "custom"
+    assert fresh.session_state["custom_bg"] == "#102030"
+    assert fresh.session_state["rendered_design"] == ("soft", custom)
+    assert fakes["gemini"] == 1                         # opening did not ask the AI again
+
+
+def test_a_file_that_is_not_a_project_shows_an_error(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.file_uploader(key="project_file").set_value(("x.json", b"hello", "application/json")).run()
+    assert not app.exception
+    assert any("Could not open this file" in e.value for e in app.error)
+
+
+def test_uploading_own_picture_replaces_the_photo(fakes):
+    from generator.design.sample_deck import sample_photo
+    app = generated_app(fakes)
+    index, version = photo_slide_index(app), app.session_state["edit_version"]
+    app.file_uploader(key=f"own_{version}_{index}").set_value(("me.jpg", sample_photo(), "image/jpeg")).run()
+    assert not app.exception and not app.error
+    keyword = app.session_state["deck"].slides[index].image_keyword
+    assert keyword.startswith("upload-") and app.session_state["photos"][keyword].credit == ""
+
+    version = app.session_state["edit_version"]
+    app.file_uploader(key=f"own_{version}_{index}").set_value(("x.jpg", b"not a picture", "image/jpeg")).run()
+    assert any("not a picture" in w.value for w in app.warning)
+
+
+def test_another_photo_and_remove_photo(fakes, monkeypatch):
+    from generator.design.sample_deck import sample_photo
+    replacement = unsplash.Photo(sample_photo(), "data:image/jpeg;base64,", "New Author", "https://u/new", "id-2")
+    seen = {}
+
+    def fake_another(keyword, exclude_ids, client_id=None):
+        seen["keyword"], seen["exclude"] = keyword, set(exclude_ids)
+        return replacement, []
+
+    monkeypatch.setattr(unsplash, "fetch_another", fake_another)
+    app = generated_app(fakes)
+    index, version = photo_slide_index(app), app.session_state["edit_version"]
+    keyword = app.session_state["deck"].slides[index].image_keyword
+    app.button(key=f"another_{version}_{index}").click().run()
+    assert not app.exception and not app.error
+    assert seen["keyword"] == keyword and app.session_state["photos"][keyword].author == "New Author"
+
+    version = app.session_state["edit_version"]
+    app.button(key=f"remove_{version}_{index}").click().run()
+    assert app.session_state["deck"].slides[index].image_keyword is None

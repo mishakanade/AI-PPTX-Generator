@@ -99,9 +99,10 @@ def _picture_html(item, image_urls):
     if not url:
         return ""
     style = _rect(item) + f"background:url('{url}') center/cover no-repeat;"
+    label = f' role="img" aria-label="{html.escape(item.alt, quote=True)}"' if item.alt else ""
     if item.radius:
         style += f"border-radius:{_cqw(item.radius)};"
-    return f'<div style="{style}"></div>'
+    return f'<div style="{style}"{label}></div>'
 
 
 def _nice_ceiling(value):

@@ -543,6 +543,9 @@ def build_specs(deck, style, palette, image_keys, credits=None):
         ctx.variant = seen.get(slide.type, 0)
         seen[slide.type] = ctx.variant + 1
         spec = LAYOUTS[slide.type](ctx, slide)
+        for item in spec.items:
+            if isinstance(item, Picture) and not item.alt and not str(slide.image_keyword).startswith("upload-"):
+                item.alt = slide.image_keyword or ""     # the photo search phrase describes the photo
         # speaker notes: what to say, then (if the slide shows a photo) who took the photo
         notes = [slide.notes] if slide.notes else []
         if _image_key(ctx, slide) and slide.type in ("bullets", "image") and credits.get(slide.image_keyword):

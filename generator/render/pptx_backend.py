@@ -164,6 +164,9 @@ def _draw_picture(slide, item, images):
         picture.crop_top = picture.crop_bottom = extra
     if item.radius > 0:
         _set_picture_radius(picture, item.radius, item.w, item.h)
+    if item.alt:
+        # PowerPoint's "alt text": read aloud by screen readers instead of the image
+        picture._element.nvPicPr.cNvPr.set("descr", item.alt)
 
 
 CHART_TYPES = {

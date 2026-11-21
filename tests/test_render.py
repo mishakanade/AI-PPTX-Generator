@@ -71,3 +71,11 @@ def test_custom_colours_are_used_and_made_readable():
     data = build_pptx(SAMPLE_DECK, "minimal", theme, {})
     background = Presentation(BytesIO(data)).slides[0].background.fill.fore_color.rgb
     assert tuple(background) == (240, 240, 240)
+
+
+def test_photos_have_alternative_text():
+    data = build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {SAMPLE_IMAGE: sample_photo()})
+    descriptions = [shape._element.nvPicPr.cNvPr.get("descr")
+                    for slide in Presentation(BytesIO(data)).slides for shape in slide.shapes
+                    if shape.shape_type == 13]
+    assert descriptions and all(d == SAMPLE_IMAGE for d in descriptions)

@@ -86,6 +86,7 @@ class Picture:
     h: float
     key: str                       # which image to draw: a key of the images dict
     radius: float = 0.0
+    alt: str = ""                  # description for screen readers ("alternative text")
 
 
 @dataclass

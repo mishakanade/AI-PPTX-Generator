@@ -150,7 +150,9 @@ class Editorial(Style):
                  simple_text(M, 0.74, 1.5, 0.3, f"{ctx.number:02d}", font=self.body_font, size=12,
                              bold=True, color=p.accent)]
         if with_title:
-            items.append(simple_text(right - 6.0, 0.74, 6.0, 0.3, shorten(ctx.deck_title, 58),
+            # the deck title takes the rest of the line after the number, right-aligned
+            left = M + 1.6
+            items.append(simple_text(left, 0.74, right - left, 0.3, shorten(ctx.deck_title, 58),
                                      font=self.body_font, size=11, color=p.muted, align="right"))
         return items
 
@@ -335,7 +337,8 @@ class Bold(Style):
     def _big_number(self, ctx, right):
         """The huge, pale slide number in the corner."""
         p = ctx.palette
-        return simple_text(right - 3.0, 0.3, 3.0, 1.5, f"{ctx.number:02d}", font=self.heading_font, size=84,
+        # 2.2 in wide: enough for two digits, and exactly the room the title leaves free
+        return simple_text(right - 2.2, 0.3, 2.2, 1.5, f"{ctx.number:02d}", font=self.heading_font, size=84,
                            bold=True, color=mix(p.bg, p.accent, 0.3), align="right")
 
     def decorate(self, ctx):

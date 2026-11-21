@@ -58,6 +58,11 @@ class Style:
         """Draw one card and say where its text goes and in which colours."""
         raise NotImplementedError
 
+    def chart_background(self, ctx):
+        """The colour right behind charts (used for the thin gaps between doughnut slices)."""
+        background = self.background(ctx)
+        return background.start if hasattr(background, "start") else background
+
     def image_frame(self, ctx, x, y, w, h, key):
         """Draw a photo inside the given rectangle."""
         return [Picture(x, y, w, h, key, radius=self.image_radius)]

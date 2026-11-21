@@ -111,3 +111,14 @@ def make_palette(theme):
                           key=lambda ink: min(contrast(ink, accent), contrast(ink, accent_end))),
         bg_tint=mix(bg, accent, 0.12 if is_dark else 0.22),
     )
+
+
+def series_colors(palette, count):
+    """Colours for chart series or pie slices: the accent first, then calmer relatives of it."""
+    p = palette
+    strong = p.title if contrast(p.title, p.bg) >= 3 else p.text
+    base = [
+        p.accent, strong, mix(p.accent, p.bg, 0.45), mix(strong, p.bg, 0.45),
+        mix(p.accent, strong, 0.5), mix(p.accent, p.bg, 0.7), p.muted, mix(strong, p.bg, 0.7),
+    ]
+    return [base[i % len(base)] for i in range(count)]

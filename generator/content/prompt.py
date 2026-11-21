@@ -62,9 +62,10 @@ def build_prompt(topic, doc_text, tone, text_amount, commentary, num_slides, spe
     if num_slides >= 4:
         lines.append('- The last slide must be of type "closing".')
     if num_slides >= 8:
-        lines.append('- You may use one or two "section" slides to divide the presentation into parts.')
+        lines.append('- You may use one or two "section" slides to divide the presentation into parts, '
+                     'and an "agenda" slide as the first slide.')
     else:
-        lines.append('- Do not use "section" slides: the presentation is too short for them.')
+        lines.append('- Do not use "section" or "agenda" slides: the presentation is too short for them.')
 
     lines += [
         "",

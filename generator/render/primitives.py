@@ -89,8 +89,55 @@ class Picture:
 
 
 @dataclass
+class ChartShape:
+    """A native, editable PowerPoint chart (drawn as SVG in the preview)."""
+    x: float
+    y: float
+    w: float
+    h: float
+    kind: str                       # "column", "bar", "line" or "pie" (drawn as a doughnut)
+    categories: List[str]
+    series: List[Tuple[str, List[float]]]   # (name, one value per category)
+    colors: List[Color]             # one per series; for pie, one per category
+    text_color: Color
+    grid_color: Color
+    background: Color               # slide colour, used for the gaps between doughnut slices
+    font: str = "Calibri"
+    font_size: float = 14
+    unit: str = ""
+
+    @property
+    def decimals(self):
+        """How many decimal places the numbers need (0, 1 or 2)."""
+        values = [v for _, vs in self.series for v in vs]
+        for places in (0, 1):
+            if all(abs(v * 10 ** places - round(v * 10 ** places)) < 1e-9 for v in values):
+                return places
+        return 2
+
+    def label(self, value):
+        """A value as it is printed on the chart: 7 000, 12.5%, 3.2 bn $."""
+        text = f"{value:,.{self.decimals}f}".replace(",", "\u00a0")   # digit groups split by a non-breaking space
+        if not self.unit:
+            return text
+        return text + (self.unit if self.unit == "%" else "\u00a0" + self.unit)
+
+    @property
+    def show_values(self):
+        """Values are written on the bars / points when that stays readable: a single series.
+
+        A doughnut never carries them: its values are part of the legend instead.
+        """
+        return len(self.series) == 1 and self.kind != "pie"
+
+    @property
+    def legend(self):
+        return self.kind == "pie" or len(self.series) > 1
+
+
+@dataclass
 class SlideSpec:
     """Everything needed to draw one slide. Items are drawn in order, later ones on top."""
     background: Fill
-    items: List[Union[Box, Text, Picture]] = field(default_factory=list)
+    items: List[Union[Box, Text, Picture, ChartShape]] = field(default_factory=list)
     notes: str = ""                # speaker notes

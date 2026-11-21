@@ -46,9 +46,11 @@ def test_preview_has_one_snippet_per_slide_and_shows_the_photo():
 def test_speaker_notes_come_before_the_photo_credit():
     deck = SAMPLE_DECK.model_copy(deep=True)
     deck.notes = "Welcome everyone."
-    deck.slides[0].notes = "Cities are growing fast."            # this slide has the sample photo
+    index = next(i for i, slide in enumerate(deck.slides) if slide.image_keyword == SAMPLE_IMAGE)
+    deck.slides[index].notes = "Cities are growing fast."
     data = build_pptx(deck, "minimal", "Corporate Blue", {SAMPLE_IMAGE: sample_photo()},
                       credits={SAMPLE_IMAGE: "Photo by Jane Doe on Unsplash"})
     slides = Presentation(BytesIO(data)).slides
     assert slides[0].notes_slide.notes_text_frame.text == "Welcome everyone."
-    assert slides[1].notes_slide.notes_text_frame.text == "Cities are growing fast.\n\nPhoto by Jane Doe on Unsplash"
+    photo_slide = slides[index + 1]                     # +1: the title slide comes first
+    assert photo_slide.notes_slide.notes_text_frame.text == "Cities are growing fast.\n\nPhoto by Jane Doe on Unsplash"

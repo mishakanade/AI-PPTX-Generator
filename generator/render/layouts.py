@@ -5,12 +5,14 @@ content, and returns a SlideSpec - the list of boxes, texts and pictures to draw
 Layouts decide *where* things go and how big the text is; *how* things look
 (card shape, title treatment, fonts) is asked from the active style.
 """
-from generator.design.colors import WHITE
+import math
+
+from generator.design.colors import WHITE, series_colors
 from generator.render.layout_tools import MARGIN as M
-from generator.render.layout_tools import Area, Ctx, measured, rule, stack
+from generator.render.layout_tools import Area, Ctx, heading, measured, rule, stack
 from generator.render.primitives import SLIDE_H as H
 from generator.render.primitives import SLIDE_W as W
-from generator.render.primitives import Box, Para, Picture, SlideSpec, Text
+from generator.render.primitives import Box, ChartShape, Para, Picture, SlideSpec, Text
 from generator.render.textfit import (
     POINTS_PER_INCH, apply_scale, best_scale, count_lines, fit, fit_single_line, line_height,
     simple_text, text_height, text_width,
@@ -434,6 +436,70 @@ def layout_table(ctx, slide):
     return SlideSpec(style.background(ctx), items)
 
 
+def layout_chart(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    items, area = style.frame(ctx, slide.title)
+    chart = slide.chart
+    colors = series_colors(p, len(chart.categories) if chart.kind == "pie" else len(chart.series))
+
+    chart_w = area.w
+    if slide.subtitle:
+        # the main insight sits in a narrow column on the right, next to the chart
+        side_w = 3.4
+        chart_w = area.w - side_w - 0.6
+        side_x = area.right - side_w
+        insight = Text(side_x, 0, side_w, area.h * 0.8, [Para(slide.subtitle)], font=style.heading_font,
+                       size=24, color=p.title, bold=style.heading_bold, line_spacing=1.05)
+        insight = measured(fit(insight))
+        items += stack([(Box(side_x, 0, 0.6, 0.06, fill=p.accent), 0.3), (insight, 0)], area.y, area.bottom)
+
+    items.append(ChartShape(
+        area.x, area.y, chart_w, area.h, kind=chart.kind, categories=chart.categories,
+        series=[(s.name, s.values) for s in chart.series], colors=colors, text_color=p.text,
+        grid_color=p.line, background=style.chart_background(ctx), font=style.body_font,
+        font_size=14, unit=chart.unit or "",
+    ))
+    return SlideSpec(style.background(ctx), items)
+
+
+def layout_statement(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    # 8.9 in wide: the message never reaches the slide-number corner that some styles decorate
+    x, w = M + 0.6, 8.9
+    label = measured(Text(x, 0, w, 0, [Para(slide.title)], font=style.body_font, size=18, bold=True,
+                          color=p.accent))
+    message = heading(slide.subtitle, x, 0, w, style.heading_font, 52, p.title, bold=style.heading_bold,
+                      max_lines=4, min_size=32)
+    parts = [(label, 0.25), (Box(x, 0, 1.0, 0.07, fill=p.accent), 0.45), (message, 0)]
+    return SlideSpec(style.background(ctx), style.decorate(ctx) + stack(parts, 1.9, 6.7))
+
+
+def layout_agenda(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    items, area = style.frame(ctx, slide.title)
+    parts = slide.bullets
+    columns = 2 if len(parts) > 4 else 1
+    rows = math.ceil(len(parts) / columns)
+    col_gap, row_gap = 0.8, 0.25
+    col_w = (area.w - col_gap) / 2 if columns == 2 else min(area.w, 8.5)
+    row_h = min(1.0, (area.h - row_gap * (rows - 1)) / rows)
+    marker = min(0.66, row_h * 0.8)
+
+    blocks = [Text(0, 0, col_w - marker - 0.35, row_h, [Para(part)], font=style.heading_font, size=24,
+                   color=p.title, bold=style.heading_bold, valign="middle") for part in parts]
+    scale = min(best_scale(block) for block in blocks)
+    top = _vertical_start(area, rows * row_h + (rows - 1) * row_gap)
+    for i, block in enumerate(blocks):
+        x = area.x + (i // rows) * (col_w + col_gap)
+        y = top + (i % rows) * (row_h + row_gap)
+        items += _marker(ctx, x, y + (row_h - marker) / 2, marker, i + 1)
+        block.x, block.y = x + marker + 0.35, y
+        items.append(apply_scale(block, scale))
+        if i % rows < rows - 1 and i < len(blocks) - 1:
+            items.append(rule(block.x, y + row_h + row_gap / 2, block.w, p.line, 0.012))
+    return SlideSpec(style.background(ctx), items)
+
+
 def layout_section(ctx, slide):
     return ctx.style.cover(ctx, "section", slide.title, slide.subtitle or "")
 
@@ -448,6 +514,9 @@ LAYOUTS = {
     "two_columns": layout_two_columns,
     "cards": layout_cards,
     "stats": layout_stats,
+    "chart": layout_chart,
+    "statement": layout_statement,
+    "agenda": layout_agenda,
     "quote": layout_quote,
     "timeline": layout_timeline,
     "table": layout_table,

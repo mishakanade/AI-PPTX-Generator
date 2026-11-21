@@ -13,7 +13,7 @@ import pytest
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE
 from generator.design.styles import STYLES
 from generator.render.builder import build_slides
-from generator.render.primitives import SLIDE_H, SLIDE_W, Picture, Text
+from generator.render.primitives import SLIDE_H, SLIDE_W, ChartShape, Picture, Text
 from generator.render.textfit import text_height
 from tests.stress_deck import IMG, STRESS_DECK
 
@@ -37,7 +37,12 @@ EPS = 0.02   # inches; rounding tolerance
 
 
 def occupied(block):
-    """The part of a Text block's rectangle that its lines actually cover (y, bottom)."""
+    """The part of a Text block's rectangle that its lines actually cover (y, bottom).
+
+    Charts cover their whole rectangle.
+    """
+    if isinstance(block, ChartShape):
+        return block.y, block.y + block.h
     used = min(text_height(block), block.h) if block.h else text_height(block)
     if block.valign == "middle":
         top = block.y + (block.h - used) / 2
@@ -53,6 +58,10 @@ def is_decoration(block):
     return len(block.paragraphs) == 1 and len(block.paragraphs[0].text.strip()) <= 1
 
 
+def describe(item):
+    return "a chart" if isinstance(item, ChartShape) else repr(item.paragraphs[0].text[:30])
+
+
 CASES = list(itertools.product(DECKS, STYLES, THEMES))
 
 
@@ -66,7 +75,7 @@ def slides(request):
 def test_text_and_pictures_stay_on_the_slide(slides):
     for number, spec in enumerate(slides, 1):
         for item in spec.items:
-            if isinstance(item, (Text, Picture)) and not (isinstance(item, Text) and is_decoration(item)):
+            if isinstance(item, (Text, Picture, ChartShape)) and not (isinstance(item, Text) and is_decoration(item)):
                 assert item.x >= -EPS and item.y >= -EPS, (number, item)
                 assert item.x + item.w <= SLIDE_W + EPS, (number, item)
                 bottom = occupied(item)[1] if isinstance(item, Text) else item.y + item.h
@@ -87,13 +96,14 @@ def test_every_text_fits_its_box(slides):
 def test_texts_do_not_overlap(slides):
     for number, spec in enumerate(slides, 1):
         texts = [t for t in spec.items if isinstance(t, Text) and not is_decoration(t)]
+        texts += [c for c in spec.items if isinstance(c, ChartShape)]   # nothing may be written over a chart
         for a, b in itertools.combinations(texts, 2):
             a_top, a_bottom = occupied(a)
             b_top, b_bottom = occupied(b)
             overlap_x = min(a.x + a.w, b.x + b.w) - max(a.x, b.x)
             overlap_y = min(a_bottom, b_bottom) - max(a_top, b_top)
             assert overlap_x <= EPS or overlap_y <= EPS, (
-                f"slide {number}: {a.paragraphs[0].text[:30]!r} overlaps {b.paragraphs[0].text[:30]!r}"
+                f"slide {number}: {describe(a)} overlaps {describe(b)}"
             )
 
 

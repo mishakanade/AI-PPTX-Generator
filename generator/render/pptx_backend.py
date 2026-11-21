@@ -8,13 +8,15 @@ from io import BytesIO
 
 from lxml import etree
 from pptx import Presentation
+from pptx.chart.data import CategoryChartData
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_MARKER_STYLE, XL_TICK_MARK
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
-from generator.render.primitives import SLIDE_H, SLIDE_W, Box, Gradient, Picture, Text
+from generator.render.primitives import SLIDE_H, SLIDE_W, Box, ChartShape, Gradient, Picture, Text
 from generator.render.textfit import BULLET_INDENT_EM
 
 ALIGN = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}
@@ -164,6 +166,133 @@ def _draw_picture(slide, item, images):
         _set_picture_radius(picture, item.radius, item.w, item.h)
 
 
+CHART_TYPES = {
+    "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
+    "bar": XL_CHART_TYPE.BAR_CLUSTERED,
+    "line": XL_CHART_TYPE.LINE_MARKERS,
+    "pie": XL_CHART_TYPE.DOUGHNUT,
+}
+
+
+def _number_format(item):
+    """Excel-style number format matching ChartShape.label: '#,##0.0" bn $"'."""
+    fmt = "#,##0" + ("." + "0" * item.decimals if item.decimals else "")
+    if item.unit:
+        fmt += '"' + (item.unit if item.unit == "%" else " " + item.unit).replace('"', "") + '"'
+    return fmt
+
+
+def _no_fill_background(chart):
+    """Make the chart area and the plot area transparent, so the slide shows through."""
+    space = chart._chartSpace
+    for parent, anchor in ((space, space.find(qn("c:chart"))), (space.find(qn("c:chart")).find(qn("c:plotArea")), None)):
+        sp_pr = parent.find(qn("c:spPr"))
+        if sp_pr is None:
+            sp_pr = etree.SubElement(parent, qn("c:spPr"))
+            if anchor is not None:            # in the chart space, spPr must come right after <c:chart>
+                anchor.addnext(sp_pr)
+        for child in list(sp_pr):
+            sp_pr.remove(child)
+        etree.SubElement(sp_pr, qn("a:noFill"))
+        line = etree.SubElement(sp_pr, qn("a:ln"))
+        etree.SubElement(line, qn("a:noFill"))
+
+
+def _style_axis(axis, item, color, show_labels=True):
+    axis.major_tick_mark = XL_TICK_MARK.NONE
+    axis.minor_tick_mark = XL_TICK_MARK.NONE
+    axis.format.line.color.rgb = _rgb(color)
+    axis.tick_labels.font.size = Pt(item.font_size)
+    axis.tick_labels.font.color.rgb = _rgb(item.text_color)
+    if not show_labels:
+        axis.visible = False
+
+
+def _draw_chart(slide, item):
+    data = CategoryChartData(number_format=_number_format(item))
+    if item.kind == "pie":
+        # the legend is the only place a doughnut shows its values: "USA — 48.5%"
+        data.categories = [f"{name} — {item.label(value)}" for name, value in zip(item.categories, item.series[0][1])]
+    else:
+        data.categories = item.categories
+    for name, values in item.series:
+        data.add_series(name, values)
+    frame = slide.shapes.add_chart(CHART_TYPES[item.kind], Inches(item.x), Inches(item.y),
+                                   Inches(item.w), Inches(item.h), data)
+    chart = frame.chart
+    chart.has_title = False
+    chart.font.name = item.font
+    chart.font.size = Pt(item.font_size)
+    chart.font.color.rgb = _rgb(item.text_color)
+    _no_fill_background(chart)
+
+    chart.has_legend = item.legend
+    if item.legend:
+        chart.legend.position = XL_LEGEND_POSITION.RIGHT if item.kind == "pie" else XL_LEGEND_POSITION.TOP
+        chart.legend.include_in_layout = False
+        chart.legend.font.size = Pt(item.font_size + (3 if item.kind == "pie" else 0))
+        chart.legend.font.color.rgb = _rgb(item.text_color)
+
+    plot = chart.plots[0]
+    plot.vary_by_categories = item.kind == "pie"
+    if item.show_values:
+        plot.has_data_labels = True
+        labels = plot.data_labels
+        labels.number_format = _number_format(item)
+        labels.number_format_is_linked = False
+        labels.font.size = Pt(item.font_size + 1)
+        labels.font.bold = True
+        labels.font.color.rgb = _rgb(item.text_color)
+        if item.kind in ("column", "bar"):
+            labels.position = XL_LABEL_POSITION.OUTSIDE_END
+        elif item.kind == "line":
+            labels.position = XL_LABEL_POSITION.ABOVE
+
+    if item.kind == "pie":
+        # a doughnut: one colour per slice, thin gaps in the slide colour between the slices
+        hole = chart._chartSpace.find(".//" + qn("c:holeSize"))
+        if hole is not None:
+            hole.set("val", "58")
+        for index, point in enumerate(plot.series[0].points):
+            point.format.fill.solid()
+            point.format.fill.fore_color.rgb = _rgb(item.colors[index])
+            point.format.line.color.rgb = _rgb(item.background)
+            point.format.line.width = Pt(2)
+        return
+
+    for index, series in enumerate(plot.series):
+        color = _rgb(item.colors[index])
+        if item.kind == "line":
+            series.smooth = False
+            series.format.line.color.rgb = color
+            series.format.line.width = Pt(3)
+            series.marker.style = XL_MARKER_STYLE.CIRCLE
+            series.marker.size = 9
+            series.marker.format.fill.solid()
+            series.marker.format.fill.fore_color.rgb = color
+            series.marker.format.line.color.rgb = color
+        else:
+            series.format.fill.solid()
+            series.format.fill.fore_color.rgb = color
+    if item.kind in ("column", "bar"):
+        plot.gap_width = 70
+        plot.overlap = -10 if len(item.series) > 1 else 0
+
+    _style_axis(chart.category_axis, item, item.grid_color)
+    if item.kind == "bar":
+        chart.category_axis.reverse_order = True   # first category on top, as people read
+    value_axis = chart.value_axis
+    # with numbers written on the bars the value scale is redundant; otherwise show it with light gridlines
+    _style_axis(value_axis, item, item.grid_color, show_labels=not item.show_values)
+    value_axis.format.line.fill.background()
+    value_axis.has_major_gridlines = not item.show_values
+    if value_axis.has_major_gridlines:
+        value_axis.major_gridlines.format.line.color.rgb = _rgb(item.grid_color)
+        value_axis.major_gridlines.format.line.width = Pt(0.75)
+    value_axis.tick_labels.number_format = _number_format(item)
+    value_axis.tick_labels.number_format_is_linked = False
+
+
 def draw_slide(presentation, spec, images):
     """Add one slide to the presentation and draw every item of its description."""
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])   # layout 6 is blank
@@ -175,6 +304,8 @@ def draw_slide(presentation, spec, images):
             _draw_text(slide, item)
         elif isinstance(item, Picture):
             _draw_picture(slide, item, images)
+        elif isinstance(item, ChartShape):
+            _draw_chart(slide, item)
     if spec.notes:
         slide.notes_slide.notes_text_frame.text = spec.notes
     return slide

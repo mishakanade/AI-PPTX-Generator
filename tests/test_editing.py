@@ -1,15 +1,18 @@
 """Editing slides as text (generator/content/editing.py)."""
 from generator.content.editing import apply_edits, apply_text, slide_to_text
-from generator.design.sample_deck import SAMPLE_DECK
+import pytest
+
+from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_DECK_RU
 
 
-def test_every_slide_survives_a_round_trip_unchanged():
+@pytest.mark.parametrize("deck", [SAMPLE_DECK, SAMPLE_DECK_RU], ids=["en", "ru"])
+def test_every_slide_survives_a_round_trip_unchanged(deck):
     """Turning every slide into text and back, without edits, must give the same deck."""
-    edits = [(s.title, slide_to_text(s), s.author if s.type == "quote" else None) for s in SAMPLE_DECK.slides]
-    again = apply_edits(SAMPLE_DECK, SAMPLE_DECK.title, SAMPLE_DECK.subtitle, edits)
-    for before, after in zip(SAMPLE_DECK.slides, again.slides):
+    edits = [(s.title, slide_to_text(s), s.author if s.type == "quote" else None) for s in deck.slides]
+    again = apply_edits(deck, deck.title, deck.subtitle, edits)
+    for before, after in zip(deck.slides, again.slides):
         assert after == before, before.type
-    assert len(again.slides) == len(SAMPLE_DECK.slides)
+    assert len(again.slides) == len(deck.slides)
 
 
 def test_edited_bullets_and_cards_are_read_back():

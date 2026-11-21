@@ -10,7 +10,7 @@ import itertools
 
 import pytest
 
-from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE
+from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_DECK_RU, SAMPLE_IMAGE
 from generator.design.styles import STYLES
 from generator.render.builder import build_slides
 from generator.render.primitives import SLIDE_H, SLIDE_W, ChartShape, Picture, Text
@@ -29,6 +29,7 @@ def doubled(deck):
 
 DECKS = {
     "sample": (SAMPLE_DECK, [SAMPLE_IMAGE]),
+    "sample-ru": (SAMPLE_DECK_RU, [SAMPLE_IMAGE]),
     "stress": (STRESS_DECK, [IMG]),
     "sample-x2": (doubled(SAMPLE_DECK), [SAMPLE_IMAGE]),
     "stress-x2": (doubled(STRESS_DECK), [IMG]),

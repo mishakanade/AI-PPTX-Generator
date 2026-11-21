@@ -19,7 +19,7 @@ from generator.content.llm import generate_deck
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.prompt import MAX_DOC_CHARS, build_prompt
 from generator.design.colors import from_hex, readable_theme, to_hex
-from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE, sample_photo_url
+from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
 from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import THEMES
 from generator.images.unsplash import fetch_photos, keywords_for
@@ -71,9 +71,10 @@ def show_slides(slide_htmls):
 
 
 @st.cache_data(show_spinner=False)
-def sample_preview(style_key, theme_name):
-    """The built-in example deck drawn in a style and theme. Cached: it never changes."""
-    return build_preview(SAMPLE_DECK, style_key, theme_name, {SAMPLE_IMAGE: sample_photo_url()})
+def sample_preview(style_key, theme_name, lang):
+    """The built-in example deck in the interface language, drawn in a style and theme. Cached."""
+    deck = SAMPLE_DECKS.get(lang, SAMPLE_DECKS["en"])
+    return build_preview(deck, style_key, theme_name, {SAMPLE_IMAGE: sample_photo_url()})
 
 
 def show_swatches(theme):
@@ -255,7 +256,7 @@ st.markdown(f"**{tr('style')}**")
 for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
     with column, st.container(border=True):
         # each card shows the real title slide of the example deck in this style and theme
-        show_slide(sample_preview(style_key, selected_theme)[0])
+        show_slide(sample_preview(style_key, selected_theme, lang)[0])
         st.markdown(f"**{style.name}**")
         st.caption(ui_text.pick(ui_text.STYLE_DESCRIPTIONS, lang, style_key, default=style.description))
         is_selected = st.session_state["style"] == style_key
@@ -388,4 +389,4 @@ if "pptx_bytes" in st.session_state:
 else:
     st.subheader(tr("example"))
     st.caption(tr("example_caption"))
-    show_slides(sample_preview(selected_style, selected_theme))
+    show_slides(sample_preview(selected_style, selected_theme, lang))

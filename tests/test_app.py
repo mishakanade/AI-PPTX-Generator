@@ -135,3 +135,22 @@ def test_typed_topic_survives_a_change_of_language(fakes):
     app.run()
     assert app.text_input(key="topic").value == "Космос"
     assert app.text_input(key="topic").label == "Тема презентации"
+
+
+def test_model_text_cannot_inject_markdown(fakes, monkeypatch):
+    """Notes or a title with a Markdown picture must be shown as text, not loaded from the address."""
+    def hostile(prompt, max_slides=None, retries_per_model=2, api_key=None):
+        deck = STRESS_DECK.model_copy(deep=True)
+        deck.slides = deck.slides[:3]
+        deck.title = "Deck ![t](http://evil.example/title.png)"
+        deck.slides[0].notes = "Say hi ![n](http://evil.example/notes.png)"
+        return deck
+
+    monkeypatch.setattr(llm, "generate_deck", hostile)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("x")
+    app.button(key="generate").click().run()
+    assert not app.exception
+    shown = [m.value for m in app.markdown] + [h.value for h in app.subheader]
+    assert any("evil" in text for text in shown)                       # the text is shown...
+    assert not any("![" in text for text in shown)                     # ...but never as a picture

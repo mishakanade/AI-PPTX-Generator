@@ -132,6 +132,16 @@ def edit_section(deck):
         st.rerun()
 
 
+def plain(text):
+    """Text from the model or from Unsplash, made safe to show through Markdown.
+
+    Markdown would turn ![](address) into a picture loaded from that address, so a document
+    with hidden instructions could make the model plant one. Every Markdown character is
+    escaped with a backslash, which makes Streamlit show it as an ordinary character.
+    """
+    return re.sub(r"([\\`*_{}\[\]()#+\-.!|<>~$:])", r"\\\1", str(text or ""))
+
+
 def safe_file_name(topic):
     """A file name made from the topic, without characters that file systems reject."""
     name = re.sub(r'[\\/:*?"<>|\r\n]+', " ", topic).strip()[:80].strip(" .")
@@ -339,7 +349,7 @@ if "pptx_bytes" in st.session_state:
     deck, photos = st.session_state["deck"], st.session_state["photos"]
     title_column, button_column = st.columns([2, 1], vertical_alignment="bottom")
     with title_column:
-        st.subheader(deck.title)
+        st.subheader(plain(deck.title))
         st.caption(tr("result_caption", count=len(deck.slides) + 1, style=STYLES[selected_style].name,
                       theme=theme_label))
     with button_column:
@@ -364,13 +374,13 @@ if "pptx_bytes" in st.session_state:
         with st.expander(tr("notes_header")):
             for number, (title, notes) in enumerate(slides_with_notes, 1):
                 if notes:
-                    st.markdown(f"**{number}. {title}**")
-                    st.write(notes)
+                    st.markdown(f"**{number}. {plain(title)}**")
+                    st.markdown(plain(notes))
             st.caption(tr("notes_note"))
     if photos:
         with st.expander(tr("credits_header")):
             for keyword, photo in photos.items():
-                st.markdown(tr("credit_line", keyword=keyword, author=photo.author, url=photo.author_url,
+                st.markdown(tr("credit_line", keyword=plain(keyword), author=plain(photo.author), url=photo.author_url,
                                unsplash=UNSPLASH_LINK))
             st.caption(tr("credits_note"))
     with st.expander(tr("json_header")):

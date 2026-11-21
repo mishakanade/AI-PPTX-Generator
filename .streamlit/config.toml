@@ -19,3 +19,7 @@ showSidebarBorder = true
 [theme.sidebar]
 backgroundColor = "#F7F7FB"
 secondaryBackgroundColor = "#FFFFFF"
+
+[server]
+# largest document that can be uploaded, in MB (Streamlit allows 200 by default)
+maxUploadSize = 25

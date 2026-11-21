@@ -1,0 +1,25 @@
+# Look of the Streamlit interface (not of the presentations).
+# Docs: https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+
+[client]
+# hide developer items such as the "Deploy" button
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#4F46E5"               # indigo: buttons, sliders, the selected style
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F5FA"   # sidebar and input fields
+textColor = "#1F2333"
+borderColor = "#E3E5EE"
+baseRadius = "0.6rem"
+headingFontWeights = [750, 650, 600]
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F7F7FB"
+secondaryBackgroundColor = "#FFFFFF"
+
+[server]
+# largest document that can be uploaded, in MB (Streamlit allows 200 by default)
+maxUploadSize = 25

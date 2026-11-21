@@ -14,7 +14,8 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, ValidationError
 
 SlideType = Literal[
-    "bullets", "image", "two_columns", "cards", "stats", "quote", "timeline", "table", "section", "closing",
+    "bullets", "image", "two_columns", "cards", "stats", "chart", "quote", "statement", "timeline", "table",
+    "agenda", "section", "closing",
 ]
 
 # One line per type for the prompt: when to use it and which fields to fill.
@@ -24,9 +25,12 @@ SLIDE_TYPE_GUIDE = {
     "two_columns": 'Comparison or two sides of one idea (before/after, pros/cons, A vs B). Fill "columns" with exactly 2 items.',
     "cards": 'Several parallel ideas of equal weight (features, principles, reasons). Fill "cards" with 2-4 items.',
     "stats": 'Key numbers. Fill "stats" with 2-4 items; "value" is a short figure like "73%" or "4.2M", "label" explains it. Only use numbers that are real and that you are confident about.',
+    "chart": 'Numbers that are easier to see than to read: a trend, a comparison or shares of a whole. Fill "chart": "kind" is "column", "bar", "line" or "pie"; 2-8 "categories"; 1-3 "series", each with a "name" and exactly one number in "values" per category (pie: exactly one series). Put the unit (such as "%" or "bn $") in "unit", not in the numbers. Only real data you are confident about. Optionally put the main insight in "subtitle" (one sentence).',
     "quote": 'One memorable quotation. Fill "quote" and "author". Only use a real, correctly attributed quotation.',
+    "statement": 'One key message in very large type, a pause between denser slides. "title" is a 1-3 word label such as "Key idea", "subtitle" is the message itself: one sentence of up to 15 words.',
     "timeline": 'Chronology or a step-by-step process. Fill "steps" with 3-5 items; "label" is a year or a short step name.',
     "table": 'Compact structured data. Fill "table" with 2-4 headers and 2-5 rows; every row has one cell per header.',
+    "agenda": 'Table of contents, placed right after the title slide. Fill "bullets" with the 3-6 parts of the presentation, 1-5 words each.',
     "section": 'Divider that opens a new part of a long presentation. Fill only "title" and "subtitle".',
     "closing": 'Final slide with conclusions. Fill "bullets" with 2-4 key takeaways.',
 }
@@ -50,6 +54,18 @@ class Stat(BaseModel):
 class Step(BaseModel):
     label: str = Field(description="A year or a short step name, 1-3 words")
     text: str = Field(description="One short sentence")
+
+
+class ChartSeries(BaseModel):
+    name: str = Field(description="What this series measures, e.g. a year or a country")
+    values: List[float] = Field(description="Exactly one number per category, without units")
+
+
+class Chart(BaseModel):
+    kind: Literal["column", "bar", "line", "pie"]
+    categories: List[str]
+    series: List[ChartSeries]
+    unit: Optional[str] = Field(default=None, description='Unit of the numbers, such as "%" or "bn $"')
 
 
 class TableRow(BaseModel):
@@ -76,12 +92,30 @@ class Slide(BaseModel):
     quote: Optional[str] = None
     author: Optional[str] = None
     table: Optional[Table] = None
+    chart: Optional[Chart] = None
+    notes: Optional[str] = Field(
+        default=None, description="What the presenter says on this slide: 2-4 sentences, not a copy of the slide"
+    )
 
 
 class Deck(BaseModel):
     title: str
     subtitle: str
     slides: List[Slide]
+    notes: Optional[str] = Field(default=None, description="What the presenter says on the title slide")
+
+
+class OutlineSlide(BaseModel):
+    type: SlideType
+    title: str = Field(description="Slide title, up to 8 words")
+    focus: Optional[str] = Field(default=None, description="What the slide will say, one sentence")
+
+
+class Outline(BaseModel):
+    """The plan of a presentation: one line per slide, before any slide is written."""
+    title: str
+    subtitle: str
+    slides: List[OutlineSlide]
 
 
 class ContentError(Exception):
@@ -112,6 +146,10 @@ def _as_bullets(slide):
     lines += [f"{step.label}: {step.text}" for step in slide.steps or []]
     if slide.quote:
         lines.append(f"“{slide.quote}”" + (f" — {slide.author}" if slide.author else ""))
+    if slide.chart:
+        unit = f" {slide.chart.unit}" if slide.chart.unit else ""
+        first = slide.chart.series[0].values if slide.chart.series else []
+        lines += [f"{name}: {value:g}{unit}" for name, value in zip(slide.chart.categories, first)]
     if slide.table:
         lines += [" · ".join(row.cells) for row in slide.table.rows]
     if slide.subtitle:
@@ -126,6 +164,7 @@ def _normalize_slide(slide):
         "title": _clean(slide.title) or "Slide",
         "subtitle": _clean(slide.subtitle) or None,
         "image_keyword": _clean(slide.image_keyword) or None,
+        "notes": _clean(slide.notes) or None,
     }
     kind = slide.type
 
@@ -167,6 +206,18 @@ def _normalize_slide(slide):
                     rows.append(TableRow(cells=cells))
             if len(rows) >= 2:
                 return Slide(**data, table=Table(headers=headers, rows=rows))
+    elif kind == "chart" and slide.chart:
+        chart = _normalize_chart(slide.chart)
+        if chart:
+            return Slide(**data, chart=chart)
+    elif kind == "statement":
+        statement = data["subtitle"] or (_clean_list(slide.bullets, 1) or [None])[0]
+        if statement:
+            return Slide(**{**data, "subtitle": statement})
+    elif kind == "agenda":
+        parts = _clean_list(slide.bullets, 6)
+        if len(parts) >= 2:
+            return Slide(**data, bullets=parts)
     elif kind == "image":
         return Slide(**data)
     elif kind == "section":
@@ -183,13 +234,50 @@ def _normalize_slide(slide):
     return Slide(**{**data, "type": "section"})
 
 
+def _normalize_chart(chart):
+    """Return a chart whose series all have one value per category, or None if that is impossible."""
+    categories = _clean_list(chart.categories, 8)
+    series = [s for s in chart.series if s.values][: 1 if chart.kind == "pie" else 3]
+    if not categories or not series:
+        return None
+    # cut everything to the shortest list: a missing value must not be invented
+    count = min([len(categories)] + [len(s.values) for s in series])
+    if count < 2:
+        return None
+    series = [ChartSeries(name=_clean(s.name) or f"Series {i + 1}", values=list(s.values[:count]))
+              for i, s in enumerate(series)]
+    if chart.kind == "pie" and (any(v < 0 for v in series[0].values) or sum(series[0].values) <= 0):
+        return None
+    unit = _clean(chart.unit)[:12] or None
+    return Chart(kind=chart.kind, categories=categories[:count], series=series, unit=unit)
+
+
 def normalize_deck(deck):
     """Repair a deck so that every slide can be drawn by its layout."""
     return Deck(
         title=_clean(deck.title) or "Presentation",
         subtitle=_clean(deck.subtitle),
+        notes=_clean(deck.notes) or None,
         slides=[_normalize_slide(slide) for slide in deck.slides],
     )
+
+
+def _repair_chart_numbers(chart):
+    """Turn chart values like "12,5%" into 12.5 (only needed when the strict schema was not used)."""
+    if not isinstance(chart, dict):
+        return
+    for series in chart.get("series") or []:
+        if not isinstance(series, dict) or not isinstance(series.get("values"), list):
+            continue
+        numbers = []
+        for value in series["values"]:
+            if isinstance(value, str):
+                match = re.search(r"-?\d[\d\s]*(?:[.,]\d+)?", value)
+                if not match:
+                    break       # one unreadable value: keep the numbers before it
+                value = float(match.group(0).replace(" ", "").replace(",", "."))
+            numbers.append(value)
+        series["values"] = numbers
 
 
 def parse_deck(raw_text):
@@ -215,6 +303,7 @@ def parse_deck(raw_text):
                 slide["type"] = "bullets"
             if "bullets" not in slide and isinstance(slide.get("content"), list):
                 slide["bullets"] = slide["content"]
+            _repair_chart_numbers(slide.get("chart"))
 
     try:
         deck = Deck.model_validate(data)
@@ -225,3 +314,43 @@ def parse_deck(raw_text):
     if not deck.slides:
         raise ContentError("The model returned a presentation without slides. Please try again.")
     return deck
+
+
+def parse_slide(raw_text):
+    """Turn the model's answer for a single slide into a checked and repaired Slide.
+
+    The slide goes through exactly the same checks as a slide of a whole presentation.
+    Raises ContentError when the answer is not a slide at all.
+    """
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        data = json.loads(match.group(0) if match else raw_text)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    if not isinstance(data, dict):
+        raise ContentError("The model returned a slide in an unexpected format. Please try again.")
+    return parse_deck(json.dumps({"title": "", "subtitle": "", "slides": [data]})).slides[0]
+
+
+def parse_outline(raw_text):
+    """Turn the model's plan into a checked Outline (unknown types become "bullets").
+
+    Raises ContentError when the answer is not a plan at all.
+    """
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        data = json.loads(match.group(0) if match else raw_text)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    if not isinstance(data, dict) or not isinstance(data.get("slides"), list):
+        raise ContentError("The model returned a plan in an unexpected format. Please try again.")
+    slides = []
+    for item in data["slides"][:25]:
+        if not isinstance(item, dict) or not _clean(item.get("title")):
+            continue
+        kind = item.get("type") if item.get("type") in SLIDE_TYPE_GUIDE else "bullets"
+        slides.append(OutlineSlide(type=kind, title=_clean(item["title"]), focus=_clean(item.get("focus")) or None))
+    if not slides:
+        raise ContentError("The model returned a plan without slides. Please try again.")
+    return Outline(title=_clean(data.get("title")) or "Presentation", subtitle=_clean(data.get("subtitle")),
+                   slides=slides)

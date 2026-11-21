@@ -20,6 +20,7 @@ from generator import config
 
 API_URL = "https://api.unsplash.com"
 CANDIDATES_PER_KEYWORD = 5
+MORE_CANDIDATES = 20    # for "another photo": a longer list to choose an unused one from
 PREVIEW_WIDTH = 640     # pixels; previews are embedded into the page, so they must be small
 MAX_WORKERS = 4         # how many requests run at the same time
 
@@ -28,29 +29,39 @@ MAX_WORKERS = 4         # how many requests run at the same time
 class Photo:
     data: bytes          # the image file that goes into the .pptx
     preview_url: str     # a small copy as a data: URL, for the preview in the browser
-    author: str
-    author_url: str
+    author: str = ""     # photographer on Unsplash; empty for a picture the user uploaded
+    author_url: str = ""
+    photo_id: str = ""   # Unsplash id, so that "another photo" never returns the same one
 
     @property
     def credit(self):
-        return f"Photo by {self.author} on Unsplash"
+        """The attribution line Unsplash asks for, or "" for the user's own pictures."""
+        return f"Photo by {self.author} on Unsplash" if self.author else ""
+
+
+def own_photo(data):
+    """A picture the user uploaded. Raises ValueError if the bytes are not an image."""
+    try:
+        return Photo(data=data, preview_url=make_preview(data))
+    except Exception as e:
+        raise ValueError("not an image") from e
 
 
 class UnsplashLimitError(Exception):
     """Unsplash refused the request: wrong key or the hourly request limit is used up."""
 
 
-def _headers():
+def _headers(key):
     # The key travels in a header, not in the address, so it does not end up in logs.
-    return {"Authorization": f"Client-ID {config.UNSPLASH_CLIENT_ID}", "Accept-Version": "v1"}
+    return {"Authorization": f"Client-ID {key}", "Accept-Version": "v1"}
 
 
-def _search(client, keyword):
+def _search(client, keyword, key, per_page=CANDIDATES_PER_KEYWORD):
     """Return candidate photos for a keyword: a list of dicts from the Unsplash API."""
     response = client.get(
         f"{API_URL}/search/photos",
-        params={"query": keyword.strip(), "per_page": CANDIDATES_PER_KEYWORD, "orientation": "landscape"},
-        headers=_headers(),
+        params={"query": keyword.strip(), "per_page": per_page, "orientation": "landscape"},
+        headers=_headers(key),
     )
     if response.status_code in (401, 403):
         raise UnsplashLimitError()
@@ -58,7 +69,7 @@ def _search(client, keyword):
     return response.json().get("results", [])
 
 
-def _make_preview(data):
+def make_preview(data):
     """Check that the bytes are a real image and return a small JPEG copy as a data: URL."""
     image = Image.open(BytesIO(data))
     image.load()                      # raises an error if the file is damaged
@@ -70,39 +81,43 @@ def _make_preview(data):
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-def _report_download(client, candidate):
+def _report_download(client, candidate, key):
     """Tell Unsplash that the photo is used (required by their API terms). Failures are ignored."""
     try:
-        client.get(candidate["links"]["download_location"], headers=_headers())
+        client.get(candidate["links"]["download_location"], headers=_headers(key))
     except Exception:
         pass
 
 
-def _download(client, candidate):
+def _download(client, candidate, key):
     """Download one chosen photo. Returns a Photo, or None if anything goes wrong."""
     try:
         response = client.get(candidate["urls"]["regular"])
         response.raise_for_status()
         photo = Photo(
             data=response.content,
-            preview_url=_make_preview(response.content),
+            preview_url=make_preview(response.content),
             author=candidate["user"]["name"],
             author_url=candidate["user"]["links"]["html"] + "?utm_source=ai_pptx_generator&utm_medium=referral",
+            photo_id=candidate["id"],
         )
     except Exception:
         return None
-    _report_download(client, candidate)
+    _report_download(client, candidate, key)
     return photo
 
 
-def fetch_photos(keywords):
+def fetch_photos(keywords, client_id=None):
     """Find and download one photo per keyword.
 
+    client_id: the user's Unsplash key; by default the one from .env.
     Returns (photos, warnings): photos is {keyword: Photo} and simply lacks the keywords
-    for which nothing was found; warnings is a list of messages for the user.
+    for which nothing was found; warnings is a list of codes for the interface to explain
+    (currently only "unsplash_limit").
     """
+    key = client_id or config.UNSPLASH_CLIENT_ID      # the user's key, or the one from .env
     keywords = list(dict.fromkeys(k for k in keywords if isinstance(k, str) and k.strip()))
-    if not keywords or not config.UNSPLASH_CLIENT_ID:
+    if not keywords or not key:
         return {}, []
 
     warnings = []
@@ -110,17 +125,15 @@ def fetch_photos(keywords):
         # 1. search, all keywords at once
         def safe_search(keyword):
             try:
-                return _search(client, keyword)
+                return _search(client, keyword, key)
             except UnsplashLimitError:
                 return "limit"
             except Exception:
                 return []
         found = dict(zip(keywords, pool.map(safe_search, keywords)))
         if "limit" in found.values():
-            warnings.append(
-                "Unsplash rejected some requests: the key is invalid or its hourly limit is used up, "
-                "so some slides have no photo."
-            )
+            # the key is invalid or its hourly limit is used up: some slides will have no photo
+            warnings.append("unsplash_limit")
 
         # 2. choose: the first candidate that is not already taken by another slide
         chosen, used_ids = {}, set()
@@ -132,7 +145,7 @@ def fetch_photos(keywords):
                 chosen[keyword] = pick
 
         # 3. download, all chosen photos at once
-        photos = dict(zip(chosen, pool.map(lambda c: _download(client, c), chosen.values())))
+        photos = dict(zip(chosen, pool.map(lambda c: _download(client, c, key), chosen.values())))
 
     return {keyword: photo for keyword, photo in photos.items() if photo}, warnings
 
@@ -141,3 +154,26 @@ def keywords_for(deck):
     """The search phrases of all slides of a deck that can show a photo."""
     return [slide.image_keyword for slide in deck.slides
             if slide.type in ("bullets", "image") and slide.image_keyword]
+
+
+def fetch_another(keyword, exclude_ids, client_id=None):
+    """A different photo for the keyword than the ones in exclude_ids, or None.
+
+    Returns (photo, warnings) like fetch_photos.
+    """
+    key = client_id or config.UNSPLASH_CLIENT_ID
+    if not key or not keyword:
+        return None, []
+    with httpx.Client(timeout=10, follow_redirects=True) as client:
+        try:
+            candidates = _search(client, keyword, key, per_page=MORE_CANDIDATES)
+        except UnsplashLimitError:
+            return None, ["unsplash_limit"]
+        except Exception:
+            return None, []
+        for candidate in candidates:
+            if candidate["id"] not in exclude_ids:
+                photo = _download(client, candidate, key)
+                if photo:
+                    return photo, []
+    return None, []

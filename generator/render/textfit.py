@@ -100,7 +100,7 @@ def best_scale(block, limit=None, min_scale=0.55, max_scale=1.0, fill=0.85):
     scale = 1.0
     if text_height(block, scale) > limit:
         while scale > min_scale and text_height(block, scale) > limit:
-            scale -= 0.04
+            scale = max(min_scale, scale - 0.04)   # never step past the readable limit
     else:
         while scale + 0.05 <= max_scale + 1e-9 and text_height(block, scale + 0.05) <= limit * fill:
             scale += 0.05

@@ -5,12 +5,14 @@ content, and returns a SlideSpec - the list of boxes, texts and pictures to draw
 Layouts decide *where* things go and how big the text is; *how* things look
 (card shape, title treatment, fonts) is asked from the active style.
 """
-from generator.design.colors import WHITE
+import math
+
+from generator.design.colors import WHITE, series_colors
 from generator.render.layout_tools import MARGIN as M
-from generator.render.layout_tools import Area, Ctx, measured, rule, stack
+from generator.render.layout_tools import Area, Ctx, heading, measured, rule, stack
 from generator.render.primitives import SLIDE_H as H
 from generator.render.primitives import SLIDE_W as W
-from generator.render.primitives import Box, Para, Picture, SlideSpec, Text
+from generator.render.primitives import Box, ChartShape, Para, Picture, SlideSpec, Text
 from generator.render.textfit import (
     POINTS_PER_INCH, apply_scale, best_scale, count_lines, fit, fit_single_line, line_height,
     simple_text, text_height, text_width,
@@ -89,20 +91,31 @@ def layout_bullets(ctx, slide):
     style, p = ctx.style, ctx.palette
     key = _image_key(ctx, slide)
     bullets = slide.bullets or []
+    # every second bullet slide with a photo is mirrored, so neighbours do not look identical
+    photo_left = ctx.variant % 2 == 1
     pictures = []
 
     if key and style.image_bleed:
-        # the photo takes the whole right side of the slide, from top to bottom
-        panel_x = 8.3
-        items, area = style.frame(ctx, slide.title, right=panel_x - 0.65)
-        pictures = [Picture(panel_x, 0, W - panel_x, H, key)]
+        # the photo takes a whole side of the slide, from top to bottom
+        panel_w = W - 8.3
+        if photo_left:
+            items, area = style.frame(ctx, slide.title, left=panel_w + 0.65)
+            pictures = [Picture(0, 0, panel_w, H, key)]
+        else:
+            items, area = style.frame(ctx, slide.title, right=W - panel_w - 0.65)
+            pictures = [Picture(W - panel_w, 0, panel_w, H, key)]
     elif key:
         items, full = style.frame(ctx, slide.title)
         image_w = full.w * 0.42
-        pictures = style.image_frame(ctx, full.right - image_w, full.y, image_w, full.h, key)
-        area = Area(full.x, full.y, full.w - image_w - 0.6, full.h)
+        text_w = full.w - image_w - 0.6
+        image_x = full.x if photo_left else full.right - image_w
+        pictures = style.image_frame(ctx, image_x, full.y, image_w, full.h, key)
+        area = Area(full.right - text_w if photo_left else full.x, full.y, text_w, full.h)
     else:
         items, full = style.frame(ctx, slide.title)
+        if len(bullets) >= 5 and _words(bullets) / len(bullets) <= 12:
+            # many short points and the whole width free: two columns read better than one long list
+            return SlideSpec(style.background(ctx), items + _bullet_columns(ctx, full, bullets))
         area = Area(full.x, full.y, min(full.w, 9.6), full.h)
 
     # Long items are paragraphs, short ones are bullet points: paragraphs get no bullet marks.
@@ -112,6 +125,41 @@ def layout_bullets(ctx, slide):
                 font=style.body_font, size=size, color=p.text, space_after=size * 0.7,
                 line_spacing=1.05, bullet_char=style.bullet_char, bullet_color=p.accent)
     return SlideSpec(style.background(ctx), items + [fit(text, max_scale=1.35, fill=0.8)] + pictures)
+
+
+def _bullet_columns(ctx, area, bullets):
+    """Short bullet points split into two columns that share one font size."""
+    style, p = ctx.style, ctx.palette
+    half = (len(bullets) + 1) // 2
+    gap = 0.7
+    col_w = (area.w - gap) / 2
+    size = style.body_size + 2
+    blocks = [
+        Text(area.x + i * (col_w + gap), area.y, col_w, area.h, [Para(b, bullet=True) for b in part],
+             font=style.body_font, size=size, color=p.text, space_after=size * 0.7, line_spacing=1.05,
+             bullet_char=style.bullet_char, bullet_color=p.accent)
+        for i, part in enumerate((bullets[:half], bullets[half:]))
+    ]
+    scale = min(best_scale(block, max_scale=1.4, fill=0.7) for block in blocks)
+    for block in blocks:
+        apply_scale(block, scale)
+    # short lists would huddle under the title: place the pair of columns a little above the middle
+    content_h = min(area.h, max(text_height(block) for block in blocks))
+    for block in blocks:
+        block.y, block.h = _vertical_start(area, content_h), content_h
+    return blocks
+
+
+def _marker(ctx, x, y, size, number):
+    """A list number in the style's marker: a filled circle, a filled square or just the digits."""
+    style, p = ctx.style, ctx.palette
+    label = f"{number:02d}"
+    if style.marker == "plain":
+        return [simple_text(x, y, size, size, label, font=style.heading_font, size=round(size * 72 * 0.5),
+                            bold=True, color=p.accent, valign="middle")]
+    shape = Box(x, y, size, size, fill=p.accent, ellipse=style.marker == "circle")
+    return [shape, simple_text(x, y, size, size, label, font=style.heading_font, size=round(size * 72 * 0.34),
+                               bold=True, color=p.on_accent, align="center", valign="middle")]
 
 
 def layout_image(ctx, slide):
@@ -168,9 +216,40 @@ def layout_cards(ctx, slide):
             ]
         return build
 
-    columns = 2 if len(cards) == 4 else len(cards)
-    items += _card_grid(ctx, area, [card(i, c) for i, c in enumerate(cards)], columns)
+    if ctx.variant % 2 == 1:
+        items += _card_rows(ctx, area, cards)
+    else:
+        columns = 2 if len(cards) == 4 else len(cards)
+        items += _card_grid(ctx, area, [card(i, c) for i, c in enumerate(cards)], columns)
     return SlideSpec(style.background(ctx), items)
+
+
+def _card_rows(ctx, area, cards):
+    """Cards as a numbered list: one row per card, a number marker on the left, rules between rows."""
+    style, p = ctx.style, ctx.palette
+    gap = 0.3
+    row_h = min(1.6, (area.h - gap * (len(cards) - 1)) / len(cards))
+    marker = min(0.78, row_h * 0.72)
+    text_x = area.x + marker + 0.45
+    blocks = [
+        Text(text_x, 0, area.right - text_x, row_h, [
+            Para(c.heading, size=21, bold=True, font=style.heading_font, color=p.title, space_after=4),
+            Para(c.text, size=17),
+        ], font=style.body_font, size=17, color=p.text, valign="middle")
+        for c in cards
+    ]
+    scale = min(best_scale(block, max_scale=1.2, fill=0.9) for block in blocks)
+
+    y = _vertical_start(area, row_h * len(cards) + gap * (len(cards) - 1))
+    items = []
+    for i, block in enumerate(blocks):
+        block.y = y
+        items += _marker(ctx, area.x, y + (row_h - marker) / 2, marker, i + 1)
+        items.append(apply_scale(block, scale))
+        if i < len(blocks) - 1:
+            items.append(rule(text_x, y + row_h + gap / 2, area.right - text_x, p.line, 0.012))
+        y += row_h + gap
+    return items
 
 
 def layout_stats(ctx, slide):
@@ -201,10 +280,41 @@ def layout_stats(ctx, slide):
             ]
         return build
 
-    # figures were already sized to fit one line, so this grid must not enlarge them further
-    items += _card_grid(ctx, area, [stat(s) for s in stats], columns,
-                        emphasis=style.stats_emphasis, max_scale=1.0, height_share=0.62, valign="middle")
+    if ctx.variant % 2 == 1 and len(stats) <= 3:
+        items += _open_stats(ctx, area, stats)
+    else:
+        # figures were already sized to fit one line, so this grid must not enlarge them further
+        items += _card_grid(ctx, area, [stat(s) for s in stats], columns,
+                            emphasis=style.stats_emphasis, max_scale=1.0, height_share=0.62, valign="middle")
     return SlideSpec(style.background(ctx), items)
+
+
+def _open_stats(ctx, area, stats):
+    """Figures without cards: very large numbers in columns divided by thin vertical lines."""
+    style, p = ctx.style, ctx.palette
+    gap = 0.9
+    col_w = (area.w - gap * (len(stats) - 1)) / len(stats)
+    value_size = min(fit_single_line(s.value, style.heading_font, 88, col_w, bold=True, min_size=24) for s in stats)
+    value_h = value_size * line_height(style.heading_font) / POINTS_PER_INCH
+    labels = [Text(0, 0, col_w, 0, [Para(s.label)], font=style.body_font, size=20, color=p.text,
+                   line_spacing=1.05) for s in stats]
+    label_room = area.h - value_h - 0.5
+    scale = min(best_scale(label, label_room, max_scale=1.0) for label in labels)
+    label_h = min(label_room, max(text_height(apply_scale(label, scale)) for label in labels))
+
+    content_h = value_h + 0.25 + 0.05 + 0.25 + label_h
+    y = _vertical_start(area, content_h)
+    items = []
+    for i, (stat, label) in enumerate(zip(stats, labels)):
+        x = area.x + i * (col_w + gap)
+        items.append(simple_text(x, y, col_w, value_h, stat.value, font=style.heading_font, size=value_size,
+                                 bold=True, color=p.accent))
+        items.append(Box(x, y + value_h + 0.25, 0.6, 0.05, fill=p.accent))
+        label.x, label.y, label.h = x, y + value_h + 0.55, label_h
+        items.append(label)
+        if i:
+            items.append(Box(x - gap / 2, y, 0.015, content_h, fill=p.line))   # divider between columns
+    return items
 
 
 def layout_quote(ctx, slide):
@@ -326,6 +436,70 @@ def layout_table(ctx, slide):
     return SlideSpec(style.background(ctx), items)
 
 
+def layout_chart(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    items, area = style.frame(ctx, slide.title)
+    chart = slide.chart
+    colors = series_colors(p, len(chart.categories) if chart.kind == "pie" else len(chart.series))
+
+    chart_w = area.w
+    if slide.subtitle:
+        # the main insight sits in a narrow column on the right, next to the chart
+        side_w = 3.4
+        chart_w = area.w - side_w - 0.6
+        side_x = area.right - side_w
+        insight = Text(side_x, 0, side_w, area.h * 0.8, [Para(slide.subtitle)], font=style.heading_font,
+                       size=24, color=p.title, bold=style.heading_bold, line_spacing=1.05)
+        insight = measured(fit(insight))
+        items += stack([(Box(side_x, 0, 0.6, 0.06, fill=p.accent), 0.3), (insight, 0)], area.y, area.bottom)
+
+    items.append(ChartShape(
+        area.x, area.y, chart_w, area.h, kind=chart.kind, categories=chart.categories,
+        series=[(s.name, s.values) for s in chart.series], colors=colors, text_color=p.text,
+        grid_color=p.line, background=style.chart_background(ctx), font=style.body_font,
+        font_size=14, unit=chart.unit or "",
+    ))
+    return SlideSpec(style.background(ctx), items)
+
+
+def layout_statement(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    # 8.9 in wide: the message never reaches the slide-number corner that some styles decorate
+    x, w = M + 0.6, 8.9
+    label = measured(Text(x, 0, w, 0, [Para(slide.title)], font=style.body_font, size=18, bold=True,
+                          color=p.accent))
+    message = heading(slide.subtitle, x, 0, w, style.heading_font, 52, p.title, bold=style.heading_bold,
+                      max_lines=4, min_size=32)
+    parts = [(label, 0.25), (Box(x, 0, 1.0, 0.07, fill=p.accent), 0.45), (message, 0)]
+    return SlideSpec(style.background(ctx), style.decorate(ctx) + stack(parts, 1.9, 6.7))
+
+
+def layout_agenda(ctx, slide):
+    style, p = ctx.style, ctx.palette
+    items, area = style.frame(ctx, slide.title)
+    parts = slide.bullets
+    columns = 2 if len(parts) > 4 else 1
+    rows = math.ceil(len(parts) / columns)
+    col_gap, row_gap = 0.8, 0.25
+    col_w = (area.w - col_gap) / 2 if columns == 2 else min(area.w, 8.5)
+    row_h = min(1.0, (area.h - row_gap * (rows - 1)) / rows)
+    marker = min(0.66, row_h * 0.8)
+
+    blocks = [Text(0, 0, col_w - marker - 0.35, row_h, [Para(part)], font=style.heading_font, size=24,
+                   color=p.title, bold=style.heading_bold, valign="middle") for part in parts]
+    scale = min(best_scale(block) for block in blocks)
+    top = _vertical_start(area, rows * row_h + (rows - 1) * row_gap)
+    for i, block in enumerate(blocks):
+        x = area.x + (i // rows) * (col_w + col_gap)
+        y = top + (i % rows) * (row_h + row_gap)
+        items += _marker(ctx, x, y + (row_h - marker) / 2, marker, i + 1)
+        block.x, block.y = x + marker + 0.35, y
+        items.append(apply_scale(block, scale))
+        if i % rows < rows - 1 and i < len(blocks) - 1:
+            items.append(rule(block.x, y + row_h + row_gap / 2, block.w, p.line, 0.012))
+    return SlideSpec(style.background(ctx), items)
+
+
 def layout_section(ctx, slide):
     return ctx.style.cover(ctx, "section", slide.title, slide.subtitle or "")
 
@@ -340,6 +514,9 @@ LAYOUTS = {
     "two_columns": layout_two_columns,
     "cards": layout_cards,
     "stats": layout_stats,
+    "chart": layout_chart,
+    "statement": layout_statement,
+    "agenda": layout_agenda,
     "quote": layout_quote,
     "timeline": layout_timeline,
     "table": layout_table,
@@ -348,20 +525,32 @@ LAYOUTS = {
 }
 
 
-def build_specs(deck, style, palette, image_keys, credits=None):
+def build_specs(deck, style, palette, image_keys, credits=None, footer_reserve=0.0):
     """Turn a whole Deck into slide descriptions: the title slide plus one per content slide.
 
-    credits maps picture keys to an author line; it goes into the speaker notes of the
-    slides that show that picture.
+    Speaker notes are the slide's own notes, followed by the photo credit (credits maps
+    picture keys to an author line) on slides that show a photo.
     """
     credits = credits or {}
     total = len(deck.slides) + 1
-    ctx = Ctx(palette=palette, style=style, number=1, total=total, deck_title=deck.title, images=set(image_keys))
-    specs = [style.cover(ctx, "title", deck.title, deck.subtitle)]
+    ctx = Ctx(palette=palette, style=style, number=1, total=total, deck_title=deck.title, images=set(image_keys),
+              footer_reserve=footer_reserve)
+    cover = style.cover(ctx, "title", deck.title, deck.subtitle)
+    cover.notes = deck.notes or ""
+    specs = [cover]
+    seen = {}   # how many slides of each type were drawn so far: chooses the layout variant
     for i, slide in enumerate(deck.slides):
         ctx.number = i + 2
+        ctx.variant = seen.get(slide.type, 0)
+        seen[slide.type] = ctx.variant + 1
         spec = LAYOUTS[slide.type](ctx, slide)
-        if _image_key(ctx, slide) and slide.type in ("bullets", "image"):
-            spec.notes = credits.get(slide.image_keyword, "")
+        for item in spec.items:
+            if isinstance(item, Picture) and not item.alt and not str(slide.image_keyword).startswith("upload-"):
+                item.alt = slide.image_keyword or ""     # the photo search phrase describes the photo
+        # speaker notes: what to say, then (if the slide shows a photo) who took the photo
+        notes = [slide.notes] if slide.notes else []
+        if _image_key(ctx, slide) and slide.type in ("bullets", "image") and credits.get(slide.image_keyword):
+            notes.append(credits[slide.image_keyword])
+        spec.notes = "\n\n".join(notes)
         specs.append(spec)
     return specs

@@ -9,7 +9,7 @@ Each style is a class with the same set of methods (see `Style`). The slide layo
 in render/layouts.py call these methods and never need to know which style is active.
 To add a style: subclass `Style`, override what should differ, add it to STYLES.
 """
-from generator.design.colors import WHITE, contrast, mix
+from generator.design.colors import WHITE, mix
 from generator.render.layout_tools import MARGIN as M
 from generator.render.layout_tools import Area, CardLook, heading, measured, rule, shorten, stack
 from generator.render.primitives import SLIDE_H as H
@@ -35,6 +35,7 @@ class Style:
     stats_emphasis = False    # True: number cards use the strong, filled variant
     table_header = "accent"   # "accent": filled header row, "line": bold text over a rule, "deep": dark band
     cover_title_size = 50
+    marker = "circle"         # number markers in lists: "circle", "square" or "plain" (just the number)
 
     # ----- pieces every content slide is assembled from ---------------------------------
 
@@ -45,13 +46,26 @@ class Style:
         """Shapes behind the content of a regular slide: ornaments, footer, page number."""
         return []
 
-    def frame(self, ctx, title, right=None):
-        """Draw the slide title. Returns (items, area that is left for the content)."""
+    def frame(self, ctx, title, left=None, right=None):
+        """Draw the slide title. Returns (items, area that is left for the content).
+
+        left / right limit the title and the content area horizontally, for slides where
+        a photo takes one side of the slide. By default they are the page margins.
+        """
         raise NotImplementedError
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         """Draw one card and say where its text goes and in which colours."""
         raise NotImplementedError
+
+    def bottom(self, ctx, usual):
+        """Where the content area ends: higher when room has to be left for a logo."""
+        return usual - ctx.footer_reserve
+
+    def chart_background(self, ctx):
+        """The colour right behind charts (used for the thin gaps between doughnut slices)."""
+        background = self.background(ctx)
+        return background.start if hasattr(background, "start") else background
 
     def image_frame(self, ctx, x, y, w, h, key):
         """Draw a photo inside the given rectangle."""
@@ -101,13 +115,13 @@ class Minimal(Style):
     def decorate(self, ctx):
         return [self.page_number(ctx, ctx.palette.muted)]
 
-    def frame(self, ctx, title, right=None):
-        p, right = ctx.palette, right or W - M
-        t = heading(title, M, 0.62, right - M, self.heading_font, 32, p.title, bold=False)
+    def frame(self, ctx, title, left=None, right=None):
+        p, left, right = ctx.palette, left or M, right or W - M
+        t = heading(title, left, 0.62, right - left, self.heading_font, 32, p.title, bold=False)
         line_y = t.y + t.h + 0.18
         top = line_y + 0.5
-        items = self.decorate(ctx) + [t, Box(M, line_y, 0.7, 0.045, fill=p.accent)]
-        return items, Area(M, top, right - M, 6.75 - top)
+        items = self.decorate(ctx) + [t, Box(left, line_y, 0.7, 0.045, fill=p.accent)]
+        return items, Area(left, top, right - left, self.bottom(ctx, 6.75) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -138,30 +152,33 @@ class Editorial(Style):
     description = "Serif headlines, edge-to-edge photos"
     heading_font = "Georgia"
     bullet_char = "–"
+    marker = "plain"
     image_bleed = True
     quote_italic = True
     table_header = "line"
     cover_title_size = 52
 
-    def _masthead(self, ctx, right, with_title=True):
+    def _masthead(self, ctx, left, right, with_title=True):
         """The thin rule at the top with the slide number and the deck title under it."""
         p = ctx.palette
-        items = [rule(M, 0.6, right - M, p.title, 0.025),
-                 simple_text(M, 0.74, 1.5, 0.3, f"{ctx.number:02d}", font=self.body_font, size=12,
+        items = [rule(left, 0.6, right - left, p.title, 0.025),
+                 simple_text(left, 0.74, 1.5, 0.3, f"{ctx.number:02d}", font=self.body_font, size=12,
                              bold=True, color=p.accent)]
         if with_title:
-            items.append(simple_text(right - 6.0, 0.74, 6.0, 0.3, shorten(ctx.deck_title, 58),
+            # the deck title takes the rest of the line after the number, right-aligned
+            start = left + 1.6
+            items.append(simple_text(start, 0.74, right - start, 0.3, shorten(ctx.deck_title, 58),
                                      font=self.body_font, size=11, color=p.muted, align="right"))
         return items
 
     def decorate(self, ctx):
-        return self._masthead(ctx, W - M)
+        return self._masthead(ctx, M, W - M)
 
-    def frame(self, ctx, title, right=None):
-        p, right = ctx.palette, right or W - M
-        t = heading(title, M, 1.25, right - M, self.heading_font, 34, p.title)
+    def frame(self, ctx, title, left=None, right=None):
+        p, left, right = ctx.palette, left or M, right or W - M
+        t = heading(title, left, 1.25, right - left, self.heading_font, 34, p.title)
         top = t.y + t.h + 0.45
-        return self._masthead(ctx, right) + [t], Area(M, top, right - M, 6.85 - top)
+        return self._masthead(ctx, left, right) + [t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -178,7 +195,7 @@ class Editorial(Style):
         else:
             items.append(rule(band_x + 0.7, H - 1.2, 1.0, p.on_accent, 0.04))
         if kind != "title":
-            items += self._masthead(ctx, band_x - 0.7, with_title=False)
+            items += self._masthead(ctx, M, band_x - 0.7, with_title=False)
         parts = [(rule(M, 0, 1.2, p.title, 0.045), 0.45)]
         parts.append((self.cover_text(ctx, kind, title, subtitle, bullets, M, band_x - M - 0.8,
                                       p.title, p.muted, p.text, p.accent), 0))
@@ -197,6 +214,7 @@ class Corporate(Style):
     bullet_char = "▪"
     stats_emphasis = True
     table_header = "deep"
+    marker = "square"
     cover_title_size = 42
 
     def decorate(self, ctx):
@@ -207,14 +225,14 @@ class Corporate(Style):
             self.page_number(ctx, p.muted, y=7.07, text=f"{ctx.number} / {ctx.total}"),
         ]
 
-    def frame(self, ctx, title, right=None):
-        p, right = ctx.palette, right or W - M
-        t = heading(title, M, 0, right - M, self.heading_font, 28, p.on_deep)
+    def frame(self, ctx, title, left=None, right=None):
+        p, left, right = ctx.palette, left or M, right or W - M
+        t = heading(title, left, 0, right - left, self.heading_font, 28, p.on_deep)
         band_h = max(1.25, t.h + 0.7)
         t.y = (band_h - t.h) / 2
         top = band_h + 0.5
         items = [Box(0, 0, W, band_h, fill=p.deep), Box(0, 0, 0.28, band_h, fill=p.accent), t]
-        return items + self.decorate(ctx), Area(M, top, right - M, 6.65 - top)
+        return items + self.decorate(ctx), Area(left, top, right - left, self.bottom(ctx, 6.65) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -272,14 +290,14 @@ class Soft(Style):
         return [Box(W - 2.9, -1.8, 4.4, 4.4, fill=a, alpha=0.10, ellipse=True),
                 Box(-1.4, H - 1.8, 3.2, 3.2, fill=a, alpha=0.08, ellipse=True)]
 
-    def frame(self, ctx, title, right=None):
-        p, right = ctx.palette, right or W - M
-        pill = [Box(M, 0.6, 1.25, 0.38, fill=p.accent_soft, radius=0.19),
-                simple_text(M, 0.6, 1.25, 0.38, f"{ctx.number:02d} / {ctx.total:02d}", font=self.body_font,
+    def frame(self, ctx, title, left=None, right=None):
+        p, left, right = ctx.palette, left or M, right or W - M
+        pill = [Box(left, 0.6, 1.25, 0.38, fill=p.accent_soft, radius=0.19),
+                simple_text(left, 0.6, 1.25, 0.38, f"{ctx.number:02d} / {ctx.total:02d}", font=self.body_font,
                             size=11, bold=True, color=p.accent, align="center", valign="middle")]
-        t = heading(title, M, 1.18, right - M, self.heading_font, 32, p.title)
+        t = heading(title, left, 1.18, right - left, self.heading_font, 32, p.title)
         top = t.y + t.h + 0.42
-        return self.decorate(ctx) + pill + [t], Area(M, top, right - M, 6.85 - top)
+        return self.decorate(ctx) + pill + [t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
@@ -326,7 +344,7 @@ class Bold(Style):
 
     def background(self, ctx):
         p = ctx.palette
-        return Gradient(p.bg, mix(p.bg, p.accent, 0.22), "diagonal")
+        return Gradient(p.bg, p.bg_tint, "diagonal")
 
     def _card_fill(self, ctx):
         p = ctx.palette
@@ -335,15 +353,16 @@ class Bold(Style):
     def _big_number(self, ctx, right):
         """The huge, pale slide number in the corner."""
         p = ctx.palette
-        return simple_text(right - 3.0, 0.3, 3.0, 1.5, f"{ctx.number:02d}", font=self.heading_font, size=84,
+        # 2.2 in wide: enough for two digits, and exactly the room the title leaves free
+        return simple_text(right - 2.2, 0.3, 2.2, 1.5, f"{ctx.number:02d}", font=self.heading_font, size=84,
                            bold=True, color=mix(p.bg, p.accent, 0.3), align="right")
 
     def decorate(self, ctx):
         return [self._big_number(ctx, W - M)]
 
-    def frame(self, ctx, title, right=None):
-        p = ctx.palette
-        x = M + 0.38
+    def frame(self, ctx, title, left=None, right=None):
+        p, left = ctx.palette, left or M
+        x = left + 0.38
         if right is None:
             # full-width slide: the big number sits in the corner, the title leaves room for it
             right = W - M
@@ -355,23 +374,23 @@ class Bold(Style):
             title_w = right - x
         t = heading(title, x, 0.72, title_w, self.heading_font, 34, p.title)
         top = t.y + t.h + 0.55
-        bar = Box(M, t.y + 0.06, 0.14, t.h - 0.1, fill=p.accent)
-        return decor + [bar, t], Area(M, top, right - M, 6.85 - top)
+        bar = Box(left, t.y + 0.06, 0.14, t.h - 0.1, fill=p.accent)
+        return decor + [bar, t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
 
     def card(self, ctx, x, y, w, h, index=0, emphasis=False):
         p = ctx.palette
         inner = Area(x + 0.42, y + 0.32, w - 0.72, h - 0.64)
         if emphasis:
-            fill = Gradient(p.accent, mix(p.accent, p.deep, 0.35), "diagonal")
-            return CardLook([Box(x, y, w, h, fill=fill)], inner, p.on_accent, p.on_accent, p.on_accent)
+            fill = Gradient(p.accent, p.accent_end, "diagonal")
+            ink = p.on_accent_end
+            return CardLook([Box(x, y, w, h, fill=fill)], inner, ink, ink, ink)
         items = [Box(x, y, w, h, fill=self._card_fill(ctx)), Box(x, y, 0.1, h, fill=p.accent)]
         return CardLook(items, inner, p.title, p.text, p.accent)
 
     def cover(self, ctx, kind, title, subtitle="", bullets=None):
         p = ctx.palette
-        end = mix(p.accent, p.deep, 0.4)
-        # the text colour has to stay readable across the whole gradient
-        ink = max((WHITE, (22, 24, 30)), key=lambda c: min(contrast(c, p.accent), contrast(c, end)))
+        end = p.accent_end
+        ink = p.on_accent_end   # readable across the whole gradient
         items = [
             Box(W - 5.6, -2.3, 7.0, 7.0, fill=ink, alpha=0.07, ellipse=True),
             Box(W - 3.3, 3.5, 5.2, 5.2, fill=ink, alpha=0.06, ellipse=True),

@@ -14,8 +14,9 @@ The project is in alpha and is built solo, so expect changes.
   APIs, with the model name editable. Or **no API key at all**: in copy & paste mode the app
   gives you a request to paste into ChatGPT, Claude, Gemini or any other AI chat, and builds
   the presentation (photos included) from the answer you paste back.
-- **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file
-  (up to about 60,000 characters are used). Choose the tone, the amount of text per slide
+- **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file.
+  A long document is read whole: part by part, each part digested, and the slides written from
+  the digest of all of it (up to about 300,000 characters) instead of from the first pages. Choose the tone, the amount of text per slide
   and the number of slides, and add your own wishes.
 - **Built for a purpose, not just a topic.** Choose what the talk is for (inform, persuade,
   teach, report, pitch), who listens and how long it lasts: the slides follow a storyline

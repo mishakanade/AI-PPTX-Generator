@@ -121,6 +121,11 @@ class Outline(BaseModel):
     slides: List[OutlineSlide]
 
 
+class Digest(BaseModel):
+    """The essentials of one part of a long document."""
+    points: List[str] = Field(description="Key facts, numbers, definitions and quotations, one per item")
+
+
 class ContentError(Exception):
     """The model's answer could not be turned into a presentation. The message is shown to the user."""
 
@@ -360,3 +365,16 @@ def parse_outline(raw_text):
         raise ContentError("The model returned a plan without slides. Please try again.")
     return Outline(title=_clean(data.get("title")) or "Presentation", subtitle=_clean(data.get("subtitle")),
                    slides=slides)
+
+
+def parse_digest(raw_text):
+    """The points of a digest answer. Raises ContentError when there are none."""
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        data = json.loads(match.group(0) if match else raw_text)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    points = _clean_list(data.get("points") if isinstance(data, dict) else None, 60)
+    if not points:
+        raise ContentError("The model returned an empty digest. Please try again.")
+    return Digest(points=points)

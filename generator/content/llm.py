@@ -8,9 +8,13 @@ import random
 import time
 
 from generator import config
+from generator.content.documents import split_text
+from generator.content.prompt import build_digest_prompt
 from generator.content.providers import PROVIDERS
 from generator.content.quality import check_deck, score
-from generator.content.schema import ContentError, Deck, Outline, Slide, parse_deck, parse_outline, parse_slide
+from generator.content.schema import (
+    ContentError, Deck, Digest, Outline, Slide, parse_deck, parse_digest, parse_outline, parse_slide,
+)
 
 
 def _ask(provider, model, prompt, schema, api_key):
@@ -98,3 +102,25 @@ def review_deck(deck, prompt, text_amount="Balanced", speaker_notes=True, retrie
     before = score(check_deck(deck, text_amount, speaker_notes))
     after = score(check_deck(revised, text_amount, speaker_notes))
     return revised if after >= before and revised.slides else deck
+
+
+DIGEST_PART = 25_000      # characters per part of a long document
+DIGEST_MAX_PARTS = 12     # at most this many parts are read (about 300,000 characters)
+
+
+def digest_document(text, topic, api_key=None, provider="gemini", model=None, progress=None):
+    """Read a long document whole: a digest per part, joined into one text for the presentation.
+
+    progress(number, total) is called before each part, e.g. to update a status line.
+    Returns (digest text, number of parts read, total number of parts).
+    """
+    parts = split_text(text, DIGEST_PART)
+    used = parts[:DIGEST_MAX_PARTS]
+    sections = []
+    for number, part in enumerate(used, 1):
+        if progress:
+            progress(number, len(used))
+        digest = _request(build_digest_prompt(part, number, len(used), topic), Digest, parse_digest, provider,
+                          _key(provider, api_key), model, 2)
+        sections.append(f"Part {number}:\n" + "\n".join(f"- {point}" for point in digest.points))
+    return "\n\n".join(sections), len(used), len(parts)

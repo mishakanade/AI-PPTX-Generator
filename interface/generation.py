@@ -95,6 +95,24 @@ def write_deck(prompt, num_slides, topic, settings, conn):
             return False
 
 
+def read_long_document(doc_text, topic, conn):
+    """A document too long for one request is read part by part; the presentation is then
+    written from the digest of all parts instead of from the first pages only."""
+    with st.status(tr("status_digest", number=1, total="…"), expanded=False) as status:
+        try:
+            digest, used, total = llm.digest_document(
+                doc_text, topic, api_key=conn.ai_key, provider=conn.provider, model=conn.ai_model,
+                progress=lambda number, count: status.update(label=tr("status_digest", number=number, total=count)),
+            )
+        except Exception as e:
+            status.update(label=tr("status_failed"), state="error")
+            st.error(tr("error", error=e))
+            return None
+        status.update(label=tr("status_done"), state="complete")
+    st.info(tr("doc_digested", parts=used) if used == total else tr("doc_digested_partly", parts=used, total=total))
+    return digest
+
+
 def handle_submit(form, conn):
     """Runs once when the content form is submitted."""
     doc_text = ""
@@ -102,15 +120,19 @@ def handle_submit(form, conn):
         doc_text = extract_text_from_file(form.uploaded_file)
     except DocumentReadError as e:
         st.warning(tr("doc_ignored", reason=tr(f"doc_{e.reason}", name=e.file_name)))
-    if len(doc_text) > MAX_DOC_CHARS:
-        st.info(tr("doc_long", used=MAX_DOC_CHARS, total=len(doc_text)))
-
     if conn.info and not conn.ai_key:
         st.warning(tr("add_key_first", provider=conn.info["name"]))
         return
     if not form.topic.strip() and not doc_text.strip():
         st.warning(tr("need_topic"))
         return
+    if len(doc_text) > MAX_DOC_CHARS:
+        if conn.is_chat:
+            st.info(tr("doc_long", used=MAX_DOC_CHARS, total=len(doc_text)))
+        else:
+            doc_text = read_long_document(doc_text, form.topic, conn)
+            if doc_text is None:
+                return
 
     forget_presentation()          # the previous presentation is replaced by the new one
     load_data(form)

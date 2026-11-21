@@ -528,3 +528,23 @@ def test_uploaded_data_becomes_charts_with_the_real_numbers(fakes, monkeypatch):
     assert any("Data: 1 table(s)" in i.value for i in app.info)
     chart = app.session_state["deck"].slides[0].chart
     assert chart.kind == "line" and chart.series[0].values == [120.5, 98.0, 140.0, 214.6]
+
+
+def test_a_long_document_is_read_whole_through_the_api(fakes, monkeypatch):
+    from generator.content.prompt import MAX_DOC_CHARS
+    seen = {}
+
+    def fake_digest(text, topic, **kwargs):
+        seen["length"] = len(text)
+        return "Part 1:\n- the digest of everything", 4, 4
+
+    monkeypatch.setattr(llm, "digest_document", fake_digest)
+    long_text = ("Длинный документ о космосе. " * 5000).encode()
+    assert len(long_text.decode()) > MAX_DOC_CHARS
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.file_uploader(key="document").set_value(("report.txt", long_text, "text/plain"))
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    assert seen["length"] == len(long_text.decode())                       # the whole text went in
+    assert "the digest of everything" in fakes["prompt"]                  # the slides are written from it
+    assert any("read in 4 parts" in i.value for i in app.info)

@@ -69,3 +69,21 @@ def extract_text_from_file(uploaded_file):
     if not text.strip():
         raise DocumentReadError("scan" if name.endswith(".pdf") else "empty", uploaded_file.name)
     return text
+
+
+def split_text(text, size):
+    """Cut a long text into parts of at most `size` characters, at paragraph or sentence ends
+    where possible, so that no fact is cut in half."""
+    parts, start = [], 0
+    while start < len(text):
+        end = min(start + size, len(text))
+        if end < len(text):
+            window = text[start:end]
+            cut = max(window.rfind("\n\n"), window.rfind("\n"), window.rfind(". "))
+            if cut > size // 2:                    # a natural break in the second half of the part
+                end = start + cut + 1
+        part = text[start:end].strip()
+        if part:
+            parts.append(part)
+        start = end
+    return parts

@@ -32,7 +32,13 @@ def fakes(monkeypatch):
         photo = unsplash.Photo(sample_photo(), sample_photo_url(), "Jane Doe", "https://unsplash.com/@jane")
         return {k: photo for k in keywords if k != "missing"}, []
 
+    def fake_review(deck, prompt, *args, **kwargs):
+        counts["review"] = counts.get("review", 0) + 1
+        counts["review_prompt"] = prompt
+        return deck                                   # the editor's pass changes nothing here
+
     monkeypatch.setattr(llm, "generate_deck", fake_generate)
+    monkeypatch.setattr(llm, "review_deck", fake_review)
     monkeypatch.setattr(unsplash, "fetch_photos", fake_photos)
     monkeypatch.setattr(config, "GEMINI_API_KEY", "fake")
     monkeypatch.setattr(config, "UNSPLASH_CLIENT_ID", "fake")
@@ -446,3 +452,55 @@ def test_pdf_button_only_where_libreoffice_exists(fakes, monkeypatch):
 
     app.selectbox(key="theme").set_value("Cyberpunk").run()        # a new design: the old PDF is not offered
     assert [b for b in app.button if b.key == "make_pdf"]
+
+
+def test_the_editors_pass_runs_after_writing_unless_switched_off(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Космос")
+    app.selectbox(key="goal").set_value("persuade")
+    app.text_input(key="audience").set_value("депутаты")
+    app.number_input(key="minutes").set_value(15)
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    assert "convince the audience" in fakes["prompt"] and "AUDIENCE: депутаты" in fakes["prompt"]
+    assert "so that the talk lasts about 15 minutes" in fakes["prompt"]
+    assert fakes["review"] == 1 and "PROBLEMS FOUND:" in fakes["review_prompt"]
+
+    app.checkbox(key="auto_review").uncheck()
+    app.button(key="generate").click().run()
+    assert fakes["gemini"] == 2 and fakes["review"] == 1
+
+
+def test_quality_section_lists_problems_and_fixes_them_with_ai(fakes, monkeypatch):
+    app = generated_app(fakes)
+    quality = [e for e in app.expander if "Quality check" in e.label]
+    assert quality and "/100" in quality[0].label
+
+    better = app.session_state["deck"].model_copy(deep=True)
+    better.slides[0].title = "Новый заголовок-тезис для первого слайда"
+    monkeypatch.setattr(llm, "review_deck", lambda deck, prompt, *a, **k: better)
+    app.button(key="fix_ai").click().run()
+    assert not app.exception and not app.error
+    assert app.session_state["deck"].slides[0].title == "Новый заголовок-тезис для первого слайда"
+
+
+def test_quality_fix_by_copy_and_paste(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.selectbox(key="provider").set_value("chat").run()
+    app.text_input(key="topic").set_value("x")
+    app.button(key="generate").click().run()
+    draft = {"title": "T", "subtitle": "", "slides": [
+        {"type": "bullets", "title": "Problems", "bullets": ["In today's world things change"]}]}
+    app.text_area(key="chat_answer_deck").set_value(json.dumps(draft))
+    app.button(key="chat_build_deck").click().run()
+    app.button(key="fix_chat_show").click().run()
+    request = [c.value for c in app.code if "PROBLEMS FOUND" in c.value]
+    assert request and "names a topic" in request[0] and "in today's world" in request[0]
+
+    version = app.session_state["edit_version"]
+    fixed = {"title": "T", "subtitle": "", "slides": [
+        {"type": "bullets", "title": "Change is now measured in months", "bullets": ["Things change fast"]}]}
+    app.text_area(key=f"fix_chat_answer_{version}").set_value(json.dumps(fixed))
+    app.button(key="fix_chat_apply").click().run()
+    assert not app.exception and not app.error
+    assert app.session_state["deck"].slides[0].title == "Change is now measured in months"

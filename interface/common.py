@@ -26,6 +26,14 @@ DEFAULT_MODELS = {"gemini": config.MODELS[0], "openai": config.OPENAI_MODEL, "cl
 PROVIDER_NAMES = {"gemini": "Gemini", "openai": "ChatGPT", "claude": "Claude"}
 
 
+def current_settings():
+    """The generation settings of the current presentation, with defaults for whatever is missing
+    (a project saved by an older version, or a deck opened from a bare JSON file)."""
+    from generator.content.presets import TONE_PRESETS
+    defaults = {"tone": next(iter(TONE_PRESETS)), "text_amount": "Balanced", "speaker_notes": True}
+    return {**defaults, **(st.session_state.get("settings") or {})}
+
+
 @dataclass
 class Connection:
     """Who writes the content and with which keys, as chosen in the sidebar."""

@@ -9,6 +9,7 @@ import time
 
 from generator import config
 from generator.content.providers import PROVIDERS
+from generator.content.quality import check_deck, score
 from generator.content.schema import ContentError, Deck, Outline, Slide, parse_deck, parse_outline, parse_slide
 
 
@@ -84,3 +85,16 @@ def regenerate_slide(prompt, retries_per_model=2, api_key=None, provider="gemini
 def generate_outline(prompt, retries_per_model=2, api_key=None, provider="gemini", model=None):
     """Ask a model for the plan of a presentation (see prompt.build_outline_prompt)."""
     return _request(prompt, Outline, parse_outline, provider, _key(provider, api_key), model, retries_per_model)
+
+
+def review_deck(deck, prompt, text_amount="Balanced", speaker_notes=True, retries_per_model=2, api_key=None,
+                provider="gemini", model=None):
+    """The editor's pass (see prompt.build_review_prompt). Returns the better of draft and revision.
+
+    The revision is kept only if the automatic check finds it at least as good as the draft,
+    so this step can never make the presentation worse by the check's measure.
+    """
+    revised = _request(prompt, Deck, parse_deck, provider, _key(provider, api_key), model, retries_per_model)
+    before = score(check_deck(deck, text_amount, speaker_notes))
+    after = score(check_deck(revised, text_amount, speaker_notes))
+    return revised if after >= before and revised.slides else deck

@@ -8,14 +8,15 @@ import ui_text
 from generator import export
 from generator.content import llm
 from generator.content.editing import apply_edits, slide_to_text
-from generator.content.presets import TONE_PRESETS
-from generator.content.prompt import build_slide_prompt
-from generator.content.schema import ContentError, parse_slide
+from generator.content.prompt import build_review_prompt, build_slide_prompt
+from generator.content.quality import check_deck, describe_for_model, score
+from generator.content.schema import ContentError, parse_deck, parse_slide
 from generator.design.styles import STYLES
 from generator.images import unsplash
 from generator.project import save_project
 from generator.render.builder import build_pptx, build_preview
-from interface.common import UNSPLASH_LINK, current_language, plain, sample_preview, show_slides, tr
+from interface import generation
+from interface.common import UNSPLASH_LINK, current_language, current_settings, plain, sample_preview, show_slides, tr
 
 
 def render(design):
@@ -85,6 +86,7 @@ def result_section(design, conn):
 
     show_slides(st.session_state["preview"])
     st.caption(tr("preview_note"))
+    _quality_section(deck, conn)
     _edit_section(deck)
     _photos_section(deck, photos, conn)
     _regenerate_section(deck, conn)
@@ -110,6 +112,77 @@ def _pdf_buttons():
                 st.error(tr("pdf_error", error=e))
                 return
         st.rerun()
+
+
+# ----- the quality check ----------------------------------------------------------------------
+
+def _issue_text(issue):
+    number = {"n": issue.slide + 2} if issue.slide is not None else {}
+    values = dict(issue.values)
+    if "type" in values:                     # the slide type by its name in the interface language
+        values["type"] = ui_text.pick(ui_text.SLIDE_TYPES, current_language(), values["type"])
+    return tr(f"q_{issue.code}", **number, **values)
+
+
+def _replace_deck(deck):
+    st.session_state["deck"] = deck
+    st.session_state.pop("rendered_design", None)    # forces render() to draw again
+    st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
+
+
+def _quality_section(deck, conn):
+    """What the app's own checks find in the slides, and a way to let the AI fix it."""
+    settings = current_settings()
+    issues = check_deck(deck, settings["text_amount"], settings["speaker_notes"])
+    with st.expander(tr("quality_header", score=score(issues))):
+        message = st.session_state.pop("fix_message", None)
+        if message:
+            st.info(message)
+        if not issues:
+            st.success(tr("quality_clean"))
+            return
+        st.caption(tr("quality_caption"))
+        st.markdown("\n".join("- " + plain(_issue_text(issue)) for issue in issues))
+        if conn.is_chat:
+            _fix_by_chat(deck, issues, settings)
+        elif st.button(tr("fix_ai"), key="fix_ai", disabled=not conn.ai_key):
+            with st.spinner(tr("fix_working", provider=conn.name)):
+                try:
+                    fixed = generation.review(deck, settings, conn)
+                except Exception as e:
+                    st.error(tr("error", error=e))
+                    return
+            if fixed is deck:
+                st.session_state["fix_message"] = tr("fix_not_better")
+            else:
+                _replace_deck(fixed)
+            st.rerun()
+
+
+def _fix_by_chat(deck, issues, settings):
+    """Copy & paste: the editing request for the chat, and the edited version pasted back."""
+    version = st.session_state.get("edit_version", 0)
+    if st.button(tr("fix_chat_show"), key="fix_chat_show"):
+        st.session_state["fix_chat_version"] = version
+    if st.session_state.get("fix_chat_version") != version:
+        return
+    prompt = build_review_prompt(deck, describe_for_model(issues), settings["tone"], settings["text_amount"],
+                                 settings["speaker_notes"], for_chat=True, **generation.brief(settings))
+    st.code(prompt, language=None, wrap_lines=True, height=220)
+    answer = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"), key=f"fix_chat_answer_{version}")
+    if not st.button(tr("fix_chat_apply"), key="fix_chat_apply"):
+        return
+    if not answer.strip():
+        st.warning(tr("chat_need_answer"))
+        return
+    try:
+        fixed = parse_deck(answer)
+    except ContentError as e:
+        st.error(tr("chat_bad_answer", error=e))
+        return
+    st.session_state.pop("fix_chat_version", None)
+    _replace_deck(fixed)
+    st.rerun()
 
 
 # ----- editing the text -------------------------------------------------------------------------
@@ -168,10 +241,9 @@ def _regenerate_section(deck, conn):
         wish = st.text_input(tr("regen_wish"), placeholder=tr("regen_wish_placeholder"), key=f"regen_wish_{version}")
 
         # the slide is written with the settings of the original generation
-        settings = st.session_state.get("settings") or {"tone": next(iter(TONE_PRESETS)),
-                                                        "text_amount": "Balanced", "speaker_notes": True}
+        settings = current_settings()
         prompt = build_slide_prompt(deck, index, wish, settings["tone"], settings["text_amount"],
-                                    settings["speaker_notes"], for_chat=conn.is_chat)
+                                    settings["speaker_notes"], for_chat=conn.is_chat, **generation.brief(settings))
         slide = _slide_by_chat(prompt, version, index) if conn.is_chat else _slide_by_api(prompt, conn)
     if slide is None:
         return

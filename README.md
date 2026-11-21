@@ -17,6 +17,14 @@ The project is in alpha and is built solo, so expect changes.
 - **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file
   (up to about 60,000 characters are used). Choose the tone, the amount of text per slide
   and the number of slides, and add your own wishes.
+- **Built for a purpose, not just a topic.** Choose what the talk is for (inform, persuade,
+  teach, report, pitch), who listens and how long it lasts: the slides follow a storyline
+  made for that purpose, titles state takeaways instead of naming topics, and speaker notes
+  are as long as the talk needs.
+- **Checked and improved, automatically.** After writing, the app checks every slide
+  (topic-label titles, filler phrases, repeated points, too much text, numbers without
+  numbers, a slide in another language…), shows a quality score, and lets the AI fix what it
+  found in a second pass. The revision is kept only if it is not worse by the same checks.
 - **Plan first, if you like.** Tick "Show me the plan first": the AI proposes the list of slides
   (type, title, one-line focus), you edit it, and only then the slides are written by it.
 - **13 slide types.** The model picks the type that suits each slide: bullets, full-screen photo,
@@ -139,6 +147,8 @@ generator/
     schema.py                slide types and fields; validation and repair of the answer
     documents.py             reads TXT / PDF / DOCX
     editing.py               slides as editable text and back
+    storytelling.py          purposes, storylines and writing rules the prompts apply
+    quality.py               the automatic content checks and the quality score
   design/
     themes.py                the 32 colour palettes
     colors.py                derives card, line, text-on-accent and chart colours from a palette

@@ -7,6 +7,7 @@ import ui_text
 from generator import config
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
 from generator.content.schema import ContentError
+from generator.content.storytelling import DEFAULT_GOAL, GOALS
 from generator.design.colors import to_hex
 from generator.project import load_project
 from interface.common import (
@@ -27,11 +28,17 @@ class ContentForm:
     num_slides: int
     speaker_notes: bool
     outline_first: bool
+    goal: str = DEFAULT_GOAL
+    audience: str = ""
+    minutes: int = 0
+    auto_review: bool = True
 
     @property
     def settings(self):
         """The choices that also matter later, e.g. when one slide is regenerated."""
-        return {"tone": self.tone, "text_amount": self.text_amount, "speaker_notes": self.speaker_notes}
+        return {"tone": self.tone, "text_amount": self.text_amount, "speaker_notes": self.speaker_notes,
+                "goal": self.goal, "audience": self.audience, "minutes": self.minutes or None,
+                "auto_review": self.auto_review}
 
 
 def language_switch():
@@ -96,6 +103,11 @@ def content_form():
         with st.form("generation_form"):
             topic = st.text_input(tr("topic"), placeholder=tr("topic_placeholder"), key="topic")
             uploaded_file = st.file_uploader(tr("document"), type=["txt", "pdf", "docx"], key="document")
+            goal = st.selectbox(
+                tr("goal"), options=list(GOALS), key="goal", help=tr("goal_help"),
+                format_func=lambda key: ui_text.pick(ui_text.GOALS, lang, key),
+            )
+            audience = st.text_input(tr("audience"), placeholder=tr("audience_placeholder"), key="audience")
             tone = st.selectbox(
                 tr("tone"), options=list(TONE_PRESETS.keys()), key="tone",
                 format_func=lambda key: ui_text.pick(ui_text.TONES, lang, key),
@@ -106,10 +118,13 @@ def content_form():
             )
             commentary = st.text_input(tr("wishes"), placeholder=tr("wishes_placeholder"), key="wishes")
             num_slides = st.slider(tr("num_slides"), min_value=2, max_value=15, value=6, step=1, key="num_slides")
+            minutes = st.number_input(tr("minutes"), min_value=0, max_value=120, value=0, step=5, key="minutes",
+                                      help=tr("minutes_help"))
             speaker_notes = st.checkbox(tr("speaker_notes"), value=True, help=tr("speaker_notes_help"),
                                         key="speaker_notes")
             outline_first = st.checkbox(tr("outline_first"), value=False, help=tr("outline_first_help"),
                                         key="outline_first")
+            auto_review = st.checkbox(tr("auto_review"), value=True, help=tr("auto_review_help"), key="auto_review")
             submitted = st.form_submit_button(tr("generate"), type="primary", width="stretch", key="generate")
         st.caption(tr("design_hint"))
         st.file_uploader(tr("open_project"), type=["json"], key="project_file", on_change=open_project,
@@ -119,7 +134,7 @@ def content_form():
     if error:
         st.error(tr("project_error", error=error))
     return ContentForm(submitted, topic, uploaded_file, tone, text_amount, commentary, num_slides,
-                       speaker_notes, outline_first)
+                       speaker_notes, outline_first, goal, audience, int(minutes or 0), auto_review)
 
 
 def open_project():

@@ -59,6 +59,15 @@ TEXTS = {
         "num_slides": "Number of slides",
         "speaker_notes": "Write speaker notes",
         "speaker_notes_help": "What to say on each slide. Saved in the notes of the PowerPoint file.",
+        "goal": "Purpose of the talk",
+        "goal_help": "Sets the storyline: how the slides are ordered and what each one has to do.",
+        "audience": "Audience (optional)",
+        "audience_placeholder": "City council members / first-year students / investors",
+        "minutes": "Length of the talk, minutes (optional)",
+        "minutes_help": "Sets how much the speaker notes say. 0 = not set.",
+        "auto_review": "Check and improve automatically",
+        "auto_review_help": "After writing, the app checks every slide (topic-label titles, filler phrases, "
+                            "repetitions, too much text…) and lets the AI fix what it found in a second pass.",
         "outline_first": "Show me the plan first",
         "outline_first_help": "The AI first proposes the list of slides; you edit it, then the slides are written.",
         "generate": "🚀 Generate presentation",
@@ -162,6 +171,29 @@ TEXTS = {
         "regen_chat_show": "📋 Show the request",
         "regen_chat_apply": "Apply the answer",
 
+
+        # quality check
+        "status_reviewing": "Checking the slides and letting {provider} fix what was found…",
+        "quality_header": "🩺 Quality check: {score}/100",
+        "quality_clean": "No problems found: titles state takeaways, no filler, no repetitions, text fits.",
+        "quality_caption": "Found by the app's own checks. Fix them by hand under Edit slides, or let the AI do it.",
+        "fix_ai": "🪄 Fix with AI",
+        "fix_working": "{provider} is editing the presentation…",
+        "fix_not_better": "The AI's version was not better by these checks, so the current one is kept.",
+        "fix_chat_show": "📋 Show the editing request",
+        "fix_chat_apply": "Apply the edited version",
+        "q_title_label": "Slide {n}: the title “{title}” only names a topic; a takeaway sentence works better.",
+        "q_title_long": "Slide {n}: the title is long ({words} words).",
+        "q_too_much_text": "Slide {n}: {words} words of bullets (the limit is {limit}).",
+        "q_long_items": "Slide {n}: {count} texts are longer than {limit} words.",
+        "q_filler": "Slide {n}: filler phrase “{phrase}”.",
+        "q_stat_without_number": "Slide {n}: the figure “{value}” has no number in it.",
+        "q_language_mix": "Slide {n}: written in a different language than the rest.",
+        "q_repeat": "Slide {n}: repeats a point from slide {other}.",
+        "q_same_type_run": "Slide {n}: the third “{type}” slide in a row.",
+        "q_no_closing": "There is no closing slide with takeaways.",
+        "q_missing_notes": "Speaker notes are missing on slides {slides}.",
+
         # outline
         "outline_header": "🗂️ The plan",
         "outline_caption": "Change the types and titles, delete slides or fill in an empty row to add one. "
@@ -252,6 +284,15 @@ TEXTS = {
         "num_slides": "Количество слайдов",
         "speaker_notes": "Писать заметки докладчика",
         "speaker_notes_help": "Что говорить на каждом слайде. Сохраняется в заметках файла PowerPoint.",
+        "goal": "Цель выступления",
+        "goal_help": "Задаёт схему повествования: в каком порядке идут слайды и что каждый должен сделать.",
+        "audience": "Аудитория (необязательно)",
+        "audience_placeholder": "Депутаты гордумы / первокурсники / инвесторы",
+        "minutes": "Длительность выступления, минут (необязательно)",
+        "minutes_help": "Определяет объём заметок докладчика. 0 — не задано.",
+        "auto_review": "Проверить и улучшить автоматически",
+        "auto_review_help": "После написания приложение проверяет каждый слайд (заголовки-ярлыки, «вода», "
+                            "повторы, слишком много текста…) и даёт ИИ исправить найденное вторым проходом.",
         "outline_first": "Сначала показать план",
         "outline_first_help": "ИИ сначала предложит список слайдов; вы его поправите, и только потом пишутся слайды.",
         "generate": "🚀 Создать презентацию",
@@ -350,6 +391,27 @@ TEXTS = {
         "regen_chat_show": "📋 Показать запрос",
         "regen_chat_apply": "Применить ответ",
 
+        "status_reviewing": "Проверяю слайды, {provider} исправляет найденное…",
+        "quality_header": "🩺 Проверка качества: {score}/100",
+        "quality_clean": "Проблем не найдено: заголовки — тезисы, без «воды» и повторов, текст помещается.",
+        "quality_caption": "Найдено собственными проверками приложения. Исправьте вручную в «Правке слайдов» или поручите ИИ.",
+        "fix_ai": "🪄 Исправить с ИИ",
+        "fix_working": "{provider} редактирует презентацию…",
+        "fix_not_better": "Версия ИИ по этим проверкам не оказалась лучше, поэтому оставлена текущая.",
+        "fix_chat_show": "📋 Показать запрос на правку",
+        "fix_chat_apply": "Применить исправленную версию",
+        "q_title_label": "Слайд {n}: заголовок «{title}» только называет тему; лучше сформулировать вывод.",
+        "q_title_long": "Слайд {n}: длинный заголовок ({words} слов).",
+        "q_too_much_text": "Слайд {n}: {words} слов в пунктах (предел — {limit}).",
+        "q_long_items": "Слайд {n}: {count} текста(ов) длиннее {limit} слов.",
+        "q_filler": "Слайд {n}: «вода» — «{phrase}».",
+        "q_stat_without_number": "Слайд {n}: в цифре «{value}» нет числа.",
+        "q_language_mix": "Слайд {n}: написан на другом языке, чем остальные.",
+        "q_repeat": "Слайд {n}: повторяет мысль со слайда {other}.",
+        "q_same_type_run": "Слайд {n}: третий подряд слайд типа «{type}».",
+        "q_no_closing": "Нет итогового слайда с выводами.",
+        "q_missing_notes": "Нет заметок докладчика на слайдах {slides}.",
+
         "outline_header": "🗂️ План",
         "outline_caption": "Поменяйте типы и заголовки, удалите слайды или заполните пустую строку, чтобы добавить. "
                            "Затем ИИ напишет слайды строго по этому плану.",
@@ -390,6 +452,13 @@ TEXTS = {
         "regen_button": "🔄 Пересоздать",
         "regen_working": "{provider} переписывает слайд…",
     },
+}
+
+GOALS = {
+    "en": {"inform": "Inform / overview", "persuade": "Persuade / proposal", "teach": "Teach / lecture",
+           "report": "Report / results", "pitch": "Pitch / investors"},
+    "ru": {"inform": "Рассказать / обзор", "persuade": "Убедить / предложение", "teach": "Обучить / лекция",
+           "report": "Отчитаться / результаты", "pitch": "Питч / инвесторы"},
 }
 
 # Names of the choices in the form. The internal values (the keys) never change.

@@ -184,3 +184,46 @@ def test_slide_prompt_marks_the_slide_and_passes_the_wish():
     marked = [line for line in prompt.splitlines() if "<-- THIS SLIDE" in line]
     assert marked == [f'  4. {SAMPLE_DECK.slides[3].type}: "{SAMPLE_DECK.slides[3].title}"   <-- THIS SLIDE']
     assert '"Make it a chart"' in prompt
+
+
+# ----- the editor's pass ------------------------------------------------------------------
+
+def _deck(title):
+    return {"title": "Urban mobility", "subtitle": "", "slides": [
+        {"type": "bullets", "title": title, "bullets": ["Shared bikes replace short car trips"], "notes": "n"}]}
+
+
+def test_review_keeps_a_better_revision(fake_model):
+    from generator.content.schema import parse_deck
+    calls, script = fake_model
+    draft = parse_deck(json.dumps(_deck("Problems")))                           # a topic label
+    script.append(json.dumps(_deck("Short car trips are moving to shared bikes")))
+    result = llm.review_deck(draft, "prompt")
+    assert result.slides[0].title == "Short car trips are moving to shared bikes"
+
+
+def test_review_never_makes_the_deck_worse(fake_model):
+    from generator.content.schema import parse_deck
+    calls, script = fake_model
+    draft = parse_deck(json.dumps(_deck("Short car trips are moving to shared bikes")))
+    worse = _deck("Problems")
+    worse["slides"][0]["bullets"] = ["In today's world bikes play a key role"]
+    script.append(json.dumps(worse))
+    assert llm.review_deck(draft, "prompt") is draft
+
+
+def test_prompts_carry_purpose_audience_rules_and_talk_length():
+    prompt = build_prompt("Bikes", "", "💼 Professional", "Balanced", "", 6, goal="pitch",
+                          audience="seed investors", minutes=10)
+    assert "make investors or partners want to back the idea" in prompt
+    assert "AUDIENCE: seed investors" in prompt and "the ask: what you want" in prompt
+    assert "states that point as a short sentence" in prompt
+    assert "about 186 words each, so that the talk lasts about 10 minutes" in prompt
+    from generator.content.prompt import build_review_prompt
+    review = build_review_prompt(parse_deck_for_test(), "1. slide 2: fix it", "💼 Professional", "Balanced")
+    assert "PROBLEMS FOUND:\n1. slide 2: fix it" in review and '"title": "T"' in review
+
+
+def parse_deck_for_test():
+    from generator.content.schema import parse_deck
+    return parse_deck(GOOD_ANSWER)

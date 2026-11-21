@@ -8,7 +8,9 @@ import streamlit as st
 import ui_text
 from generator.content import llm
 from generator.content.documents import DocumentReadError, extract_text_from_file
-from generator.content.prompt import MAX_DOC_CHARS, build_outline_prompt, build_prompt
+from generator.content.prompt import MAX_DOC_CHARS, build_outline_prompt, build_prompt, build_review_prompt
+from generator.content.quality import check_deck, describe_for_model
+from generator.content.storytelling import DEFAULT_GOAL
 from generator.content.schema import SLIDE_TYPE_GUIDE, ContentError, Outline, OutlineSlide, parse_deck, parse_outline
 from generator.images import unsplash
 from interface.common import current_language, forget_presentation, safe_file_name, tr
@@ -25,12 +27,31 @@ def store_deck(deck, topic, settings, conn):
     st.session_state["edit_version"] = st.session_state.get("edit_version", 0) + 1
 
 
+def brief(settings):
+    """Purpose, audience and talk length from the settings (older projects may not have them)."""
+    return {"goal": settings.get("goal") or DEFAULT_GOAL, "audience": settings.get("audience") or ""}
+
+
+def review(deck, settings, conn):
+    """The editor's pass: fix what the automatic check found. Returns the better version."""
+    issues = check_deck(deck, settings["text_amount"], settings["speaker_notes"])
+    if not issues:
+        return deck
+    prompt = build_review_prompt(deck, describe_for_model(issues), settings["tone"], settings["text_amount"],
+                                 settings["speaker_notes"], **brief(settings))
+    return llm.review_deck(deck, prompt, settings["text_amount"], settings["speaker_notes"],
+                           api_key=conn.ai_key, provider=conn.provider, model=conn.ai_model)
+
+
 def write_deck(prompt, num_slides, topic, settings, conn):
     """Ask the AI API for the slides and store them, with a status box. Returns True on success."""
     with st.status(tr("status_writing", provider=conn.name), expanded=False) as status:
         try:
             deck = llm.generate_deck(prompt, max_slides=num_slides, api_key=conn.ai_key,
                                      provider=conn.provider, model=conn.ai_model)
+            if settings.get("auto_review"):
+                status.update(label=tr("status_reviewing", provider=conn.name))
+                deck = review(deck, settings, conn)
             status.update(label=tr("status_photos"))
             store_deck(deck, topic, settings, conn)
             status.update(label=tr("status_done"), state="complete")
@@ -64,7 +85,7 @@ def handle_submit(form, conn):
 
     if form.outline_first:
         outline_prompt = build_outline_prompt(form.topic, doc_text, form.tone, form.commentary, form.num_slides,
-                                              for_chat=conn.is_chat)
+                                              for_chat=conn.is_chat, **brief(form.settings))
         if conn.is_chat:
             st.session_state["chat_request"] = {"kind": "outline", "prompt": outline_prompt, **plan_request}
             return
@@ -80,7 +101,8 @@ def handle_submit(form, conn):
 
     prompt = build_prompt(topic=form.topic, doc_text=doc_text, tone=form.tone, text_amount=form.text_amount,
                           commentary=form.commentary, num_slides=form.num_slides,
-                          speaker_notes=form.speaker_notes, for_chat=conn.is_chat)
+                          speaker_notes=form.speaker_notes, for_chat=conn.is_chat,
+                          minutes=form.minutes or None, **brief(form.settings))
     if conn.is_chat:
         # copy & paste: the request is shown by chat_panel(); the deck is built when the answer comes back
         st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": form.topic,
@@ -181,6 +203,7 @@ def outline_panel(conn):
         topic=request["topic"], doc_text=request["doc_text"], tone=settings["tone"],
         text_amount=settings["text_amount"], commentary=request["commentary"], num_slides=len(edited),
         speaker_notes=settings["speaker_notes"], for_chat=conn.is_chat, outline=approved,
+        minutes=settings.get("minutes"), **brief(settings),
     )
     if conn.is_chat:
         st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": request["topic"],

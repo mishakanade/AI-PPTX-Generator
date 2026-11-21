@@ -9,7 +9,7 @@ import time
 
 from generator import config
 from generator.content.providers import PROVIDERS
-from generator.content.schema import ContentError, Deck, Slide, parse_deck, parse_slide
+from generator.content.schema import ContentError, Deck, Outline, Slide, parse_deck, parse_outline, parse_slide
 
 
 def _ask(provider, model, prompt, schema, api_key):
@@ -79,3 +79,8 @@ def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None, pr
 def regenerate_slide(prompt, retries_per_model=2, api_key=None, provider="gemini", model=None):
     """Ask a model for one new slide (see prompt.build_slide_prompt) and return it checked."""
     return _request(prompt, Slide, parse_slide, provider, _key(provider, api_key), model, retries_per_model)
+
+
+def generate_outline(prompt, retries_per_model=2, api_key=None, provider="gemini", model=None):
+    """Ask a model for the plan of a presentation (see prompt.build_outline_prompt)."""
+    return _request(prompt, Outline, parse_outline, provider, _key(provider, api_key), model, retries_per_model)

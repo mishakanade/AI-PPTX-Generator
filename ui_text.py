@@ -59,6 +59,8 @@ TEXTS = {
         "num_slides": "Number of slides",
         "speaker_notes": "Write speaker notes",
         "speaker_notes_help": "What to say on each slide. Saved in the notes of the PowerPoint file.",
+        "outline_first": "Show me the plan first",
+        "outline_first_help": "The AI first proposes the list of slides; you edit it, then the slides are written.",
         "generate": "🚀 Generate presentation",
         "design_hint": "The design on the right can be changed at any time, even after generation.",
 
@@ -96,6 +98,8 @@ TEXTS = {
         "need_topic": "⚠️ Please enter a topic or upload a document!",
         "status_writing": "Writing the content with {provider}…",
         "status_photos": "Looking for photos on Unsplash…",
+        "status_planning": "Planning the presentation with {provider}…",
+        "status_plan_done": "The plan is ready",
         "status_done": "Content is ready",
         "status_failed": "Generation failed",
         "error": "❌ An error occurred: {error}",
@@ -157,6 +161,18 @@ TEXTS = {
         ),
         "regen_chat_show": "📋 Show the request",
         "regen_chat_apply": "Apply the answer",
+
+        # outline
+        "outline_header": "🗂️ The plan",
+        "outline_caption": "Change the types and titles, delete slides or fill in an empty row to add one. "
+                           "Then the AI writes the slides exactly by this plan.",
+        "outline_type": "Type",
+        "outline_title": "Title",
+        "outline_focus": "What it says",
+        "outline_delete": "Delete",
+        "outline_new": "New slide",
+        "outline_write": "✍️ Write the slides",
+        "outline_empty": "⚠️ The plan needs at least one slide.",
 
         # projects
         "save_project": "💾 Save project",
@@ -231,6 +247,8 @@ TEXTS = {
         "num_slides": "Количество слайдов",
         "speaker_notes": "Писать заметки докладчика",
         "speaker_notes_help": "Что говорить на каждом слайде. Сохраняется в заметках файла PowerPoint.",
+        "outline_first": "Сначала показать план",
+        "outline_first_help": "ИИ сначала предложит список слайдов; вы его поправите, и только потом пишутся слайды.",
         "generate": "🚀 Создать презентацию",
         "design_hint": "Оформление справа можно менять когда угодно, даже после генерации.",
 
@@ -266,6 +284,8 @@ TEXTS = {
         "need_topic": "⚠️ Введите тему или загрузите документ!",
         "status_writing": "{provider} пишет содержание…",
         "status_photos": "Ищу фотографии на Unsplash…",
+        "status_planning": "{provider} составляет план…",
+        "status_plan_done": "План готов",
         "status_done": "Содержание готово",
         "status_failed": "Генерация не удалась",
         "error": "❌ Произошла ошибка: {error}",
@@ -324,6 +344,17 @@ TEXTS = {
         ),
         "regen_chat_show": "📋 Показать запрос",
         "regen_chat_apply": "Применить ответ",
+
+        "outline_header": "🗂️ План",
+        "outline_caption": "Поменяйте типы и заголовки, удалите слайды или заполните пустую строку, чтобы добавить. "
+                           "Затем ИИ напишет слайды строго по этому плану.",
+        "outline_type": "Тип",
+        "outline_title": "Заголовок",
+        "outline_focus": "О чём слайд",
+        "outline_delete": "Удалить",
+        "outline_new": "Новый слайд",
+        "outline_write": "✍️ Написать слайды",
+        "outline_empty": "⚠️ В плане должен быть хотя бы один слайд.",
 
         "save_project": "💾 Сохранить проект",
         "save_project_help": "Всё в одном файле: текст, фото, стиль и цвета. Откройте его позже, чтобы продолжить.",

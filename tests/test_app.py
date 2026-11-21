@@ -213,8 +213,8 @@ def test_copy_and_paste_mode_builds_the_deck_from_a_pasted_answer(fakes, monkeyp
     answer = {"title": "Космос", "subtitle": "Обзор", "slides": [
         {"type": "bullets", "title": f"Слайд {i}", "bullets": ["a", "b"], "image_keyword": "rocket launch"}
         for i in range(5)]}
-    app.text_area(key="chat_answer").set_value("Конечно! Вот JSON:\n```json\n" + json.dumps(answer, ensure_ascii=False) + "\n```")
-    app.button(key="chat_build").click().run()
+    app.text_area(key="chat_answer_deck").set_value("Конечно! Вот JSON:\n```json\n" + json.dumps(answer, ensure_ascii=False) + "\n```")
+    app.button(key="chat_build_deck").click().run()
     assert not app.exception and not app.error
     deck = app.session_state["deck"]
     assert deck.title == "Космос" and len(deck.slides) == 3      # trimmed to the requested number
@@ -227,8 +227,8 @@ def test_copy_and_paste_mode_explains_a_broken_answer(fakes):
     app.selectbox(key="provider").set_value("chat").run()
     app.text_input(key="topic").set_value("x")
     app.button(key="generate").click().run()
-    app.text_area(key="chat_answer").set_value("Sorry, I can't help with that.")
-    app.button(key="chat_build").click().run()
+    app.text_area(key="chat_answer_deck").set_value("Sorry, I can't help with that.")
+    app.button(key="chat_build_deck").click().run()
     assert not app.exception
     assert any("Could not read a presentation" in e.value for e in app.error)
     assert "deck" not in app.session_state
@@ -241,8 +241,8 @@ def test_copy_and_paste_mode_regenerates_one_slide(fakes):
     app.button(key="generate").click().run()
     answer = {"title": "T", "subtitle": "", "slides": [
         {"type": "bullets", "title": f"S{i}", "bullets": ["a"]} for i in range(3)]}
-    app.text_area(key="chat_answer").set_value(json.dumps(answer))
-    app.button(key="chat_build").click().run()
+    app.text_area(key="chat_answer_deck").set_value(json.dumps(answer))
+    app.button(key="chat_build_deck").click().run()
     version = app.session_state["edit_version"]
 
     app.selectbox(key=f"regen_slide_{version}").set_value(2)
@@ -364,3 +364,68 @@ def test_a_logo_is_added_to_every_slide_and_saved_with_the_project(fakes):
 
     app.button(key="logo_remove").click().run()
     assert "logo" not in app.session_state and app.session_state["rendered_design"][3] is None
+
+
+PLAN = {"title": "Космос", "subtitle": "Обзор", "slides": [
+    {"type": "agenda", "title": "План", "focus": "Части"},
+    {"type": "bullets", "title": "Гонка", "focus": "Кто был первым"},
+    {"type": "stats", "title": "Цифры", "focus": "Ключевые числа"},
+]}
+
+
+def test_plan_first_through_the_api(fakes, monkeypatch):
+    from generator.content.schema import parse_outline
+    prompts = []
+
+    def fake_outline(prompt, retries_per_model=2, api_key=None, provider="gemini", model=None):
+        prompts.append(prompt)
+        return parse_outline(json.dumps(PLAN))
+
+    monkeypatch.setattr(llm, "generate_outline", fake_outline)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Космос")
+    app.checkbox(key="outline_first").check()
+    app.button(key="generate").click().run()
+    assert not app.exception and not app.error
+    assert "Write only the plan" in prompts[0] and fakes["gemini"] == 0
+    version = app.session_state["outline_version"]
+
+    app.text_input(key=f"o{version}_0_title").set_value("Содержание")      # rename
+    app.checkbox(key=f"o{version}_1_delete").check()                       # delete
+    app.text_input(key=f"o{version}_3_title").set_value("Итоги")           # fill an empty row
+    app.selectbox(key=f"o{version}_3_type").set_value("closing")
+    app.button(key=f"outline_write_{version}").click().run()
+    assert not app.exception and not app.error
+
+    assert fakes["gemini"] == 1
+    prompt = fakes["prompt"]
+    assert 'approved this outline' in prompt and '1. agenda: "Содержание"' in prompt
+    assert '"Гонка"' not in prompt and '3. closing: "Итоги"' in prompt
+    assert "deck" in app.session_state and "outline" not in app.session_state
+
+
+def test_plan_first_by_copy_and_paste(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.selectbox(key="provider").set_value("chat").run()
+    app.text_input(key="topic").set_value("Космос")
+    app.checkbox(key="outline_first").check()
+    app.button(key="generate").click().run()
+    assert "Write only the plan" in app.code[0].value
+
+    app.text_area(key="chat_answer_outline").set_value("```json\n" + json.dumps(PLAN, ensure_ascii=False) + "\n```")
+    app.button(key="chat_build_outline").click().run()
+    version = app.session_state["outline_version"]
+    app.button(key=f"outline_write_{version}").click().run()
+    assert not app.exception and not app.error
+    deck_prompt = app.code[0].value
+    assert "approved this outline" in deck_prompt and "ANSWER FORMAT" in deck_prompt
+
+    deck = {"title": "Космос", "subtitle": "Обзор", "slides": [
+        {"type": "agenda", "title": "План", "bullets": ["a", "b"]},
+        {"type": "bullets", "title": "Гонка", "bullets": ["x"]},
+        {"type": "stats", "title": "Цифры", "stats": [{"value": "1", "label": "a"}, {"value": "2", "label": "b"}]}]}
+    app.text_area(key="chat_answer_deck").set_value(json.dumps(deck, ensure_ascii=False))
+    app.button(key="chat_build_deck").click().run()
+    assert not app.exception and not app.error
+    assert [s.title for s in app.session_state["deck"].slides] == ["План", "Гонка", "Цифры"]
+    assert fakes["gemini"] == 0

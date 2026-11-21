@@ -17,10 +17,12 @@ import ui_text
 from generator import config
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.editing import apply_edits, slide_to_text
-from generator.content.llm import generate_deck, regenerate_slide, trim_slides
+from generator.content.llm import generate_deck, generate_outline, regenerate_slide, trim_slides
 from generator.content.presets import TEXT_AMOUNT_PRESETS, TONE_PRESETS
-from generator.content.schema import ContentError, parse_deck, parse_slide
-from generator.content.prompt import MAX_DOC_CHARS, build_prompt, build_slide_prompt
+from generator.content.schema import (
+    SLIDE_TYPE_GUIDE, ContentError, Outline, OutlineSlide, parse_deck, parse_outline, parse_slide,
+)
+from generator.content.prompt import MAX_DOC_CHARS, build_outline_prompt, build_prompt, build_slide_prompt
 from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
 from generator.design.styles import DEFAULT_STYLE, STYLES
@@ -58,6 +60,12 @@ def browser_language():
 def current_language():
     # the language switch can be clicked off (no choice): English then
     return st.session_state.get("lang") or "en"
+
+
+def tr_in(lang):
+    """A translation function fixed to one language (for list labels, which Streamlit may
+    format again later, outside the run that created them)."""
+    return lambda key: ui_text.TEXTS[lang].get(key) or ui_text.TEXTS["en"][key]
 
 
 def tr(key, **values):
@@ -232,7 +240,7 @@ def open_project():
     deck = project["deck"]
     st.session_state.update(deck=deck, photos=project["photos"], photo_warnings=[],
                             file_name=safe_file_name(deck.title), settings=project["settings"],
-                            style=project["style"], transition=project["transition"])
+                            style=project["style"], transition=project["transition"] or "none")
     if project["logo"]:
         st.session_state["logo"] = project["logo"]
     else:
@@ -342,9 +350,81 @@ def photos_section(deck, photos):
                                  on_change=upload_photo, args=(i, widget_key), label_visibility="collapsed")
 
 
+def outline_section(outline, request):
+    """Show the proposed plan as an editable form; on submit, write the slides by it."""
+    lang = current_language()
+    version = st.session_state.get("outline_version", 0)
+    types = list(SLIDE_TYPE_GUIDE)
+    st.subheader(tr("outline_header"))
+    st.caption(tr("outline_caption"))
+    with st.form(f"outline_form_{version}", border=False):
+        title = st.text_input(tr("deck_title"), outline.title, key=f"o{version}_title")
+        subtitle = st.text_input(tr("deck_subtitle"), outline.subtitle, key=f"o{version}_subtitle")
+        rows = list(outline.slides) + [None, None]          # two empty rows to add slides
+        edited = []
+        for i, slide in enumerate(rows):
+            number, kind, name, focus, delete = st.columns([0.4, 2, 4, 5, 1.4], vertical_alignment="bottom")
+            number.markdown(f"**{i + 2}**")
+            slide_type = kind.selectbox(
+                tr("outline_type"), types, index=types.index(slide.type) if slide else 0,
+                key=f"o{version}_{i}_type", label_visibility="visible" if i == 0 else "collapsed",
+                format_func=lambda key: ui_text.pick(ui_text.SLIDE_TYPES, lang, key),
+            )
+            slide_title = name.text_input(
+                tr("outline_title"), slide.title if slide else "", key=f"o{version}_{i}_title",
+                placeholder=tr("outline_new") if slide is None else "",
+                label_visibility="visible" if i == 0 else "collapsed",
+            )
+            slide_focus = focus.text_input(
+                tr("outline_focus"), (slide.focus or "") if slide else "", key=f"o{version}_{i}_focus",
+                label_visibility="visible" if i == 0 else "collapsed",
+            )
+            removed = delete.checkbox(tr("outline_delete"), key=f"o{version}_{i}_delete",
+                                      label_visibility="visible" if i == 0 else "collapsed")
+            if slide_title.strip() and not removed:
+                edited.append(OutlineSlide(type=slide_type, title=slide_title.strip(), focus=slide_focus.strip() or None))
+        write = st.form_submit_button(tr("outline_write"), type="primary", key=f"outline_write_{version}")
+    if not write:
+        return
+    if not edited:
+        st.warning(tr("outline_empty"))
+        return
+
+    approved = Outline(title=title.strip() or outline.title, subtitle=subtitle.strip(), slides=edited)
+    settings = request["settings"]
+    prompt = build_prompt(
+        topic=request["topic"], doc_text=request["doc_text"], tone=settings["tone"],
+        text_amount=settings["text_amount"], commentary=request["commentary"], num_slides=len(edited),
+        speaker_notes=settings["speaker_notes"], for_chat=provider == "chat", outline=approved,
+    )
+    if provider == "chat":
+        st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": request["topic"],
+                                            "num_slides": len(edited), "settings": settings}
+    else:
+        with st.status(tr("status_writing", provider=provider_name), expanded=False) as status:
+            try:
+                deck = generate_deck(prompt, max_slides=len(edited), api_key=ai_key, provider=provider, model=ai_model)
+                status.update(label=tr("status_photos"))
+                store_deck(deck, request["topic"], settings)
+                status.update(label=tr("status_done"), state="complete")
+            except Exception as e:
+                status.update(label=tr("status_failed"), state="error")
+                st.error(tr("error", error=e))
+                return
+    st.session_state.pop("outline", None)
+    st.rerun()
+
+
+def show_outline(outline, request):
+    """Keep a proposed plan in the session; outline_section() shows it."""
+    st.session_state["outline"] = outline
+    st.session_state["outline_request"] = request
+    st.session_state["outline_version"] = st.session_state.get("outline_version", 0) + 1
+
+
 def forget_presentation():
     for key in ("deck", "photos", "photo_warnings", "file_name", "pptx_bytes", "preview", "rendered_design",
-                "chat_request", "regen_chat_prompt"):
+                "chat_request", "regen_chat_prompt", "outline", "outline_request"):
         st.session_state.pop(key, None)
 
 
@@ -396,7 +476,7 @@ st.caption(tr("page_caption"))
 with st.sidebar:
     st.subheader(tr("ai_header"))
     provider = st.selectbox(tr("provider"), list(PROVIDERS), key="provider",
-                            format_func=lambda key: tr(f"provider_{key}"))
+                            format_func=lambda key, t=tr_in(lang): t(f"provider_{key}"))
 
 info = PROVIDERS[provider]
 server_ai_key = None
@@ -455,6 +535,8 @@ with st.sidebar:
         num_slides = st.slider(tr("num_slides"), min_value=2, max_value=15, value=6, step=1, key="num_slides")
         speaker_notes = st.checkbox(tr("speaker_notes"), value=True, help=tr("speaker_notes_help"),
                                     key="speaker_notes")
+        outline_first = st.checkbox(tr("outline_first"), value=False, help=tr("outline_first_help"),
+                                    key="outline_first")
         submit_button = st.form_submit_button(tr("generate"), type="primary", width="stretch", key="generate")
     st.caption(tr("design_hint"))
     st.file_uploader(tr("open_project"), type=["json"], key="project_file", on_change=open_project,
@@ -472,7 +554,7 @@ theme_column, transition_column, _ = st.columns([1, 1, 1])
 with theme_column:
     theme_choice = st.selectbox(
         tr("colour_theme"), list(THEMES.keys()) + [CUSTOM_THEME], key="theme",
-        format_func=lambda name: tr("custom_colours") if name == CUSTOM_THEME else name,
+        format_func=lambda name, label=tr("custom_colours"): label if name == CUSTOM_THEME else name,
     )
     if theme_choice == CUSTOM_THEME:
         # four colour pickers, starting from the first built-in theme
@@ -494,10 +576,11 @@ with theme_column:
     show_swatches(theme_colors(selected_theme))
 
 with transition_column:
-    transition = st.selectbox(
-        tr("transition"), [None, "fade", "push", "wipe"], key="transition", help=tr("transition_help"),
-        format_func=lambda name: tr(f"transition_{name or 'none'}"),
+    choice = st.selectbox(
+        tr("transition"), ["none", "fade", "push", "wipe"], key="transition", help=tr("transition_help"),
+        format_func=lambda name, t=tr_in(lang): t(f"transition_{name}"),
     )
+    transition = None if choice == "none" else choice
     # the logo lives in the session (not only in the uploader), so that an opened project can set it
     logo = st.session_state.get("logo")
     if logo:
@@ -560,11 +643,27 @@ if submit_button:
         )
         settings = {"tone": selected_tone, "text_amount": selected_text_amount, "speaker_notes": speaker_notes}
         forget_presentation()          # the previous presentation is replaced by the new one
+        plan_request = {"topic": topic, "doc_text": doc_text, "commentary": additional_commentary,
+                        "settings": settings}
 
-        if provider == "chat":
+        if outline_first:
+            outline_prompt = build_outline_prompt(topic, doc_text, selected_tone, additional_commentary, num_slides,
+                                                  for_chat=provider == "chat")
+            if provider == "chat":
+                st.session_state["chat_request"] = {"kind": "outline", "prompt": outline_prompt, **plan_request}
+            else:
+                with st.status(tr("status_planning", provider=provider_name), expanded=False) as status:
+                    try:
+                        show_outline(generate_outline(outline_prompt, api_key=ai_key, provider=provider,
+                                                      model=ai_model), plan_request)
+                        status.update(label=tr("status_plan_done"), state="complete")
+                    except Exception as e:
+                        status.update(label=tr("status_failed"), state="error")
+                        st.error(tr("error", error=e))
+        elif provider == "chat":
             # copy & paste: the request is shown below; the deck is built when the answer comes back
-            st.session_state["chat_request"] = {"prompt": prompt, "topic": topic, "num_slides": num_slides,
-                                                "settings": settings}
+            st.session_state["chat_request"] = {"kind": "deck", "prompt": prompt, "topic": topic,
+                                                "num_slides": num_slides, "settings": settings}
         else:
             with st.status(tr("status_writing", provider=provider_name), expanded=False) as status:
                 try:
@@ -587,23 +686,35 @@ if request and "deck" not in st.session_state:
     st.subheader(tr("chat_header"))
     st.markdown(tr("chat_steps"))
     st.code(request["prompt"], language=None, wrap_lines=True, height=300)
+    kind = request.get("kind", "deck")        # the plan, or the slides themselves
     pasted = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"), height=200,
-                          key="chat_answer")
-    answer_file = st.file_uploader(tr("chat_file"), type=["json", "txt", "md"], key="chat_file")
-    if st.button(tr("chat_build"), type="primary", key="chat_build"):
+                          key=f"chat_answer_{kind}")
+    answer_file = st.file_uploader(tr("chat_file"), type=["json", "txt", "md"], key=f"chat_file_{kind}")
+    if st.button(tr("chat_build") if kind == "deck" else tr("outline_header"), type="primary",
+                 key=f"chat_build_{kind}"):
         answer = answer_file.getvalue().decode("utf-8", errors="ignore") if answer_file else pasted
         if not answer.strip():
             st.warning(tr("chat_need_answer"))
         else:
             try:
-                deck = parse_deck(answer)
+                parsed = parse_deck(answer) if kind == "deck" else parse_outline(answer)
             except ContentError as e:
                 st.error(tr("chat_bad_answer", error=e))
             else:
-                deck.slides = trim_slides(deck.slides, request["num_slides"])
-                with st.spinner(tr("status_photos")):
-                    store_deck(deck, request["topic"], request["settings"])
+                st.session_state.pop("chat_request", None)
+                if kind == "outline":
+                    show_outline(parsed, {k: request[k] for k in ("topic", "doc_text", "commentary", "settings")})
+                else:
+                    parsed.slides = trim_slides(parsed.slides, request["num_slides"])
+                    with st.spinner(tr("status_photos")):
+                        store_deck(parsed, request["topic"], request["settings"])
                 st.rerun()
+
+
+# ----- the plan, when the user asked to see it first ------------------------------------------
+
+if "outline" in st.session_state and "deck" not in st.session_state and not st.session_state.get("chat_request"):
+    outline_section(st.session_state["outline"], st.session_state["outline_request"])
 
 
 # ----- rendering: runs whenever the content or the design changed ---------------------------

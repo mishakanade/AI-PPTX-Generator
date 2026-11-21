@@ -105,6 +105,19 @@ class Deck(BaseModel):
     notes: Optional[str] = Field(default=None, description="What the presenter says on the title slide")
 
 
+class OutlineSlide(BaseModel):
+    type: SlideType
+    title: str = Field(description="Slide title, up to 8 words")
+    focus: Optional[str] = Field(default=None, description="What the slide will say, one sentence")
+
+
+class Outline(BaseModel):
+    """The plan of a presentation: one line per slide, before any slide is written."""
+    title: str
+    subtitle: str
+    slides: List[OutlineSlide]
+
+
 class ContentError(Exception):
     """The model's answer could not be turned into a presentation. The message is shown to the user."""
 
@@ -317,3 +330,27 @@ def parse_slide(raw_text):
     if not isinstance(data, dict):
         raise ContentError("The model returned a slide in an unexpected format. Please try again.")
     return parse_deck(json.dumps({"title": "", "subtitle": "", "slides": [data]})).slides[0]
+
+
+def parse_outline(raw_text):
+    """Turn the model's plan into a checked Outline (unknown types become "bullets").
+
+    Raises ContentError when the answer is not a plan at all.
+    """
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        data = json.loads(match.group(0) if match else raw_text)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    if not isinstance(data, dict) or not isinstance(data.get("slides"), list):
+        raise ContentError("The model returned a plan in an unexpected format. Please try again.")
+    slides = []
+    for item in data["slides"][:25]:
+        if not isinstance(item, dict) or not _clean(item.get("title")):
+            continue
+        kind = item.get("type") if item.get("type") in SLIDE_TYPE_GUIDE else "bullets"
+        slides.append(OutlineSlide(type=kind, title=_clean(item["title"]), focus=_clean(item.get("focus")) or None))
+    if not slides:
+        raise ContentError("The model returned a plan without slides. Please try again.")
+    return Outline(title=_clean(data.get("title")) or "Presentation", subtitle=_clean(data.get("subtitle")),
+                   slides=slides)

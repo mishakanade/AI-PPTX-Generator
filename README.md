@@ -17,6 +17,8 @@ The project is in alpha and is built solo, so expect changes.
 - **Content from a topic or a document.** Type a topic, or attach a TXT, PDF or DOCX file
   (up to about 60,000 characters are used). Choose the tone, the amount of text per slide
   and the number of slides, and add your own wishes.
+- **Plan first, if you like.** Tick "Show me the plan first": the AI proposes the list of slides
+  (type, title, one-line focus), you edit it, and only then the slides are written by it.
 - **13 slide types.** The model picks the type that suits each slide: bullets, full-screen photo,
   two columns, cards, key numbers, chart, quote, key statement, timeline, table, agenda,
   section divider and closing takeaways.

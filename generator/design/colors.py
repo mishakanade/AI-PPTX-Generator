@@ -69,6 +69,10 @@ class Palette:
     deep: tuple            # a dark, saturated block colour for covers and header bands
     on_deep: tuple         # text placed on top of `deep`
     accent_on_deep: tuple  # the accent, lightened if needed so it stays visible on `deep`
+    accent_end: tuple      # second colour of accent gradients: a darker accent, or a lighter one
+                           # for very bright accents (dark yellow or dark neon green look muddy)
+    on_accent_end: tuple   # text placed on an accent -> accent_end gradient (readable on both ends)
+    bg_tint: tuple         # the background with a hint of the accent, for background gradients
 
 
 def make_palette(theme):
@@ -78,12 +82,18 @@ def make_palette(theme):
     if is_dark:
         surface = mix(bg, WHITE, 0.07)
         surface_strong = mix(bg, WHITE, 0.14)
-        deep = mix(bg, BLACK, 0.35)
+        # On a dark background a darker block would be invisible (nothing is darker than
+        # black), so the "deep" block is the background lifted with a little accent colour.
+        deep = mix(mix(bg, WHITE, 0.06), accent, 0.16)
     else:
         surface = mix(bg, title, 0.05)
         surface_strong = mix(bg, title, 0.11)
         deep = title
     on_deep = readable_on(deep)
+    if luminance(accent) > 0.35:
+        accent_end = mix(accent, WHITE, 0.35)
+    else:
+        accent_end = mix(accent, deep if not is_dark else BLACK, 0.35)
     return Palette(
         bg=bg, title=title, text=text, accent=accent,
         is_dark=is_dark,
@@ -96,4 +106,8 @@ def make_palette(theme):
         deep=deep,
         on_deep=on_deep,
         accent_on_deep=ensure_contrast(accent, deep, toward=on_deep),
+        accent_end=accent_end,
+        on_accent_end=max((WHITE, (22, 24, 30)),
+                          key=lambda ink: min(contrast(ink, accent), contrast(ink, accent_end))),
+        bg_tint=mix(bg, accent, 0.12 if is_dark else 0.22),
     )

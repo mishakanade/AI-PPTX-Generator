@@ -9,7 +9,7 @@ Each style is a class with the same set of methods (see `Style`). The slide layo
 in render/layouts.py call these methods and never need to know which style is active.
 To add a style: subclass `Style`, override what should differ, add it to STYLES.
 """
-from generator.design.colors import WHITE, contrast, mix
+from generator.design.colors import WHITE, mix
 from generator.render.layout_tools import MARGIN as M
 from generator.render.layout_tools import Area, CardLook, heading, measured, rule, shorten, stack
 from generator.render.primitives import SLIDE_H as H
@@ -326,7 +326,7 @@ class Bold(Style):
 
     def background(self, ctx):
         p = ctx.palette
-        return Gradient(p.bg, mix(p.bg, p.accent, 0.22), "diagonal")
+        return Gradient(p.bg, p.bg_tint, "diagonal")
 
     def _card_fill(self, ctx):
         p = ctx.palette
@@ -362,16 +362,16 @@ class Bold(Style):
         p = ctx.palette
         inner = Area(x + 0.42, y + 0.32, w - 0.72, h - 0.64)
         if emphasis:
-            fill = Gradient(p.accent, mix(p.accent, p.deep, 0.35), "diagonal")
-            return CardLook([Box(x, y, w, h, fill=fill)], inner, p.on_accent, p.on_accent, p.on_accent)
+            fill = Gradient(p.accent, p.accent_end, "diagonal")
+            ink = p.on_accent_end
+            return CardLook([Box(x, y, w, h, fill=fill)], inner, ink, ink, ink)
         items = [Box(x, y, w, h, fill=self._card_fill(ctx)), Box(x, y, 0.1, h, fill=p.accent)]
         return CardLook(items, inner, p.title, p.text, p.accent)
 
     def cover(self, ctx, kind, title, subtitle="", bullets=None):
         p = ctx.palette
-        end = mix(p.accent, p.deep, 0.4)
-        # the text colour has to stay readable across the whole gradient
-        ink = max((WHITE, (22, 24, 30)), key=lambda c: min(contrast(c, p.accent), contrast(c, end)))
+        end = p.accent_end
+        ink = p.on_accent_end   # readable across the whole gradient
         items = [
             Box(W - 5.6, -2.3, 7.0, 7.0, fill=ink, alpha=0.07, ellipse=True),
             Box(W - 3.3, 3.5, 5.2, 5.2, fill=ink, alpha=0.06, ellipse=True),

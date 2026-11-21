@@ -4,6 +4,7 @@ Every item becomes an absolutely positioned <div>. Positions are percentages of 
 slide, and font sizes use the CSS unit "cqw" (1% of the slide's own width), so a slide
 looks the same whether it is shown as a small thumbnail or stretched across the page.
 """
+import base64
 import html
 import math
 
@@ -124,15 +125,30 @@ def _chart_html(item):
         out.append(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size:.1f}" fill="{color}" '
                    f'text-anchor="{anchor}" font-weight="{700 if bold else 400}">{html.escape(str(value))}</text>')
 
+    def entry_width(name):
+        return font_px * 1.2 + len(name) * font_px * 0.55 + font_px * 1.5
+
+    def legend_rows(names):
+        """How many lines a horizontal legend needs within the chart width."""
+        rows, x = 1, 0.0
+        for name in names:
+            if x and x + entry_width(name) > width:
+                rows, x = rows + 1, 0.0
+            x += entry_width(name)
+        return rows
+
     def legend(entries, x, y, vertical):
+        start_x = x
         for name, color in entries:
+            if not vertical and x > start_x and x + entry_width(name) > width:
+                x, y = start_x, y + font_px * 1.5      # wrap to the next line
             out.append(f'<rect x="{x:.1f}" y="{y - font_px * 0.75:.1f}" width="{font_px * 0.8:.1f}" '
                        f'height="{font_px * 0.8:.1f}" rx="2" fill="{to_hex(color)}"/>')
             text(x + font_px * 1.2, y, name, anchor="start", size=font_px)
             if vertical:
                 y += font_px * 1.7
             else:
-                x += font_px * 1.2 + len(name) * font_px * 0.55 + font_px * 1.5
+                x += entry_width(name)
 
     if item.kind == "pie":
         values = item.series[0][1]
@@ -159,7 +175,8 @@ def _chart_html(item):
         font_px *= 1.2
         legend(list(zip(names, item.colors)), cx + radius + 40, cy - (len(names) - 1) * font_px * 0.85, True)
     else:
-        top = font_px * 2.2 if item.legend else font_px * 1.6
+        rows = legend_rows([name for name, _ in item.series]) if item.legend else 0
+        top = font_px * (0.7 + 1.5 * rows) if item.legend else font_px * 1.6
         if item.legend:
             legend([(name, color) for (name, _), color in zip(item.series, item.colors)], 0, font_px, False)
         values = [v for _, vs in item.series for v in vs]
@@ -191,7 +208,9 @@ def _chart_html(item):
             out.append(f'<line x1="{zero:.1f}" y1="{top:.1f}" x2="{zero:.1f}" y2="{height:.1f}" stroke="{grid}"/>')
         else:
             bottom = height - font_px * 1.8
-            left = 0 if item.show_values else font_px * 3.5
+            # room for the value scale on the left: as wide as its longest label
+            scale_labels = [item.label(low + (high - low) * step / 4) for step in range(5)]
+            left = 0 if item.show_values else max(len(t) for t in scale_labels) * font_px * 0.5 + 14
             plot_w = width - left
             scale = (bottom - top) / (high - low)
             zero = bottom - (0 - low) * scale
@@ -227,8 +246,12 @@ def _chart_html(item):
                             text(x, y - 14, item.label(v), bold=True)
             out.append(f'<line x1="{left:.1f}" y1="{zero:.1f}" x2="{width:.1f}" y2="{zero:.1f}" stroke="{grid}"/>')
 
-    return (f'<div style="{_rect(item)}"><svg viewBox="0 0 {width:.1f} {height:.1f}" width="100%" height="100%" '
-            f'style="overflow:visible;font-family:{family}">{"".join(out)}</svg></div>')
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.1f} {height:.1f}" '
+           f'font-family="{family}">{"".join(out)}</svg>')
+    # Streamlit strips inline <svg> from st.html for safety, so the drawing is embedded as a picture
+    url = "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode()
+    return f'<img src="{url}" alt="" style="{_rect(item)}object-fit:contain;">'
+
 
 
 def slide_to_html(spec, image_urls=None):

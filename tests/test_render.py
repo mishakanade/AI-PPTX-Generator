@@ -54,3 +54,10 @@ def test_speaker_notes_come_before_the_photo_credit():
     assert slides[0].notes_slide.notes_text_frame.text == "Welcome everyone."
     photo_slide = slides[index + 1]                     # +1: the title slide comes first
     assert photo_slide.notes_slide.notes_text_frame.text == "Cities are growing fast.\n\nPhoto by Jane Doe on Unsplash"
+
+
+def test_charts_are_embedded_as_pictures_in_the_preview():
+    """Streamlit removes inline <svg>; the chart must travel as an <img> with an SVG data URL."""
+    index = next(i for i, slide in enumerate(SAMPLE_DECK.slides) if slide.type == "chart")
+    html = build_preview(SAMPLE_DECK, "minimal", "Corporate Blue", {})[index + 1]
+    assert "<svg" not in html and 'src="data:image/svg+xml;base64,' in html

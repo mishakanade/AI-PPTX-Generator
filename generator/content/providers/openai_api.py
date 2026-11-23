@@ -37,3 +37,18 @@ def classify(error):
     if isinstance(error, openai.BadRequestError):
         return "schema"
     return "fatal"
+
+
+def explain(error):
+    """What went wrong, as a code the interface turns into advice (see content/errors.py)."""
+    if isinstance(error, (openai.AuthenticationError, openai.PermissionDeniedError)):
+        return "bad_key"
+    if isinstance(error, openai.NotFoundError):
+        return "model_not_found"
+    if isinstance(error, openai.RateLimitError):
+        return "quota" if getattr(error, "code", None) == "insufficient_quota" else "rate_limit"
+    if isinstance(error, openai.InternalServerError):
+        return "overloaded"
+    if isinstance(error, openai.APIConnectionError):        # includes timeouts
+        return "network"
+    return None

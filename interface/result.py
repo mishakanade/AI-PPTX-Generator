@@ -16,7 +16,9 @@ from generator.images import unsplash
 from generator.project import save_project
 from generator.render.builder import build_pptx, build_preview
 from interface import generation
-from interface.common import UNSPLASH_LINK, current_language, current_settings, plain, sample_preview, show_slides, tr
+from interface.common import (
+    UNSPLASH_LINK, current_language, current_settings, plain, sample_preview, show_error, show_slides, tr,
+)
 
 
 def render(design):
@@ -150,7 +152,7 @@ def _quality_section(deck, conn):
                 try:
                     fixed = generation.review(deck, settings, conn)
                 except Exception as e:
-                    st.error(tr("error", error=e))
+                    show_error(e, conn)
                     return
             if fixed is deck:
                 st.session_state["fix_message"] = tr("fix_not_better")
@@ -269,7 +271,7 @@ def _slide_by_api(prompt, conn):
         try:
             return llm.regenerate_slide(prompt, api_key=conn.ai_key, provider=conn.provider, model=conn.ai_model)
         except Exception as e:
-            st.error(tr("error", error=e))
+            show_error(e, conn)
             return None
 
 

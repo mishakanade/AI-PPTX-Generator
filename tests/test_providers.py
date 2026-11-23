@@ -177,3 +177,73 @@ def test_deck_schema_is_accepted_by_both_sdks():
     from openai.lib._pydantic import to_strict_json_schema
     assert to_strict_json_schema(Deck)["additionalProperties"] is False
     assert transform_schema(Deck)["additionalProperties"] is False
+
+
+# ----- turning failures into advice -----------------------------------------------------------
+
+def failure(callable_):
+    try:
+        callable_()
+    except Exception as e:      # noqa: BLE001 - the point is to look at whatever was raised
+        return e
+    raise AssertionError("no error was raised")
+
+
+@pytest.mark.parametrize("status, kind, code", [
+    (401, "invalid_api_key", "bad_key"),
+    (404, "model_not_found", "model_not_found"),
+    (429, "insufficient_quota", "quota"),
+    (429, "rate_limit_exceeded", "rate_limit"),
+    (500, "server_error", "overloaded"),
+])
+def test_openai_errors_become_advice(server, status, kind, code):
+    from generator.content.errors import explain
+    server.script += [(status, error(kind))] * 4
+    e = failure(lambda: llm.generate_deck("JSON", provider="openai", api_key="k", retries_per_model=1))
+    assert explain(e, "openai") == code
+
+
+@pytest.mark.parametrize("status, kind, message, code", [
+    (401, "authentication_error", "invalid x-api-key", "bad_key"),
+    (404, "not_found_error", "model: nope", "model_not_found"),
+    (429, "rate_limit_error", "slow down", "rate_limit"),
+    (529, "overloaded_error", "Overloaded", "overloaded"),
+    (400, "invalid_request_error", "Your credit balance is too low to access the API", "quota"),
+])
+def test_claude_errors_become_advice(server, status, kind, message, code):
+    from generator.content.errors import explain
+    server.script += [(status, {"type": "error", "error": {"type": kind, "message": message}})] * 4
+    e = failure(lambda: llm.generate_deck("x", provider="claude", api_key="k", retries_per_model=1))
+    assert explain(e, "claude") == code
+
+
+def test_claude_refusal_and_unusable_answers_become_advice(server):
+    from generator.content.errors import explain
+    server.script.append((200, claude_answer("", stop_reason="refusal")))
+    assert explain(failure(lambda: llm.generate_deck("x", provider="claude", api_key="k")), "claude") == "refused"
+    server.script += [(200, claude_answer("no json at all"))] * 2
+    e = failure(lambda: llm.generate_deck("x", provider="claude", api_key="k"))
+    assert explain(e, "claude") == "unusable_answer"
+
+
+@pytest.mark.parametrize("status, message, code", [
+    (400, "API key not valid. Please pass a valid API key.", "bad_key"),
+    (403, "Permission denied", "bad_key"),
+    (404, "models/nope is not found", "model_not_found"),
+    (429, "Resource has been exhausted", "rate_limit"),
+    (503, "The model is overloaded", "overloaded"),
+    (400, "Something else", "unknown"),
+])
+def test_gemini_errors_become_advice(status, message, code):
+    from google.genai import errors
+    from generator.content.errors import explain
+    error_class = errors.ServerError if status >= 500 else errors.ClientError
+    e = error_class(status, {"error": {"code": status, "message": message, "status": "X"}})
+    assert explain(e, "gemini") == code
+
+
+def test_network_failures_become_advice():
+    import httpx
+    from generator.content.errors import explain
+    assert explain(httpx.ConnectTimeout("timed out"), "gemini") == "network"
+    assert explain(ValueError("strange"), "gemini") == "unknown"

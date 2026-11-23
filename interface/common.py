@@ -7,6 +7,7 @@ import streamlit as st
 
 import ui_text
 from generator import config
+from generator.content.errors import explain
 from generator.design.colors import to_hex
 from generator.design.sample_deck import SAMPLE_DECKS, SAMPLE_IMAGE, sample_photo_url
 from generator.render.builder import build_preview
@@ -108,6 +109,17 @@ def secret(name):
         return st.secrets.get(name)
     except Exception:          # no secrets file at all
         return None
+
+
+def show_error(error, conn):
+    """Advice the user can act on, with the raw message kept under "technical details"."""
+    code = explain(error, conn.provider)
+    provider = conn.info["name"] if conn.info else conn.name
+    st.error(tr(f"err_{code}", provider=provider, model=conn.ai_model or DEFAULT_MODELS.get(conn.provider, ""),
+                error=error))
+    if code != "unknown":
+        with st.expander(tr("error_details")):
+            st.code(str(error)[:3000], language=None, wrap_lines=True)
 
 
 def forget_presentation():

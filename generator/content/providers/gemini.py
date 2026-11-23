@@ -3,6 +3,7 @@ import functools
 
 import httpx
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from generator import config
@@ -41,3 +42,19 @@ def classify(error):
     if code in RETRYABLE_CODES or isinstance(error, httpx.TimeoutException):
         return "retry"
     return "fatal"
+
+
+def explain(error):
+    """What went wrong, as a code the interface turns into advice (see content/errors.py)."""
+    if not isinstance(error, genai_errors.APIError):
+        return None
+    message = (error.message or "").lower()
+    if error.code in (401, 403) or (error.code == 400 and "api key" in message):
+        return "bad_key"
+    if error.code == 404:
+        return "model_not_found"
+    if error.code == 429:
+        return "rate_limit"        # Gemini reports both a request limit and a used-up quota as 429
+    if error.code and error.code >= 500:
+        return "overloaded"
+    return None

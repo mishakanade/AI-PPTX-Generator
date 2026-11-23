@@ -14,7 +14,7 @@ from generator.content.quality import check_deck, describe_for_model
 from generator.content.storytelling import DEFAULT_GOAL
 from generator.content.schema import SLIDE_TYPE_GUIDE, ContentError, Outline, OutlineSlide, parse_deck, parse_outline
 from generator.images import unsplash
-from interface.common import current_language, forget_presentation, safe_file_name, tr
+from interface.common import current_language, forget_presentation, safe_file_name, show_error, tr
 
 
 def bind(deck):
@@ -91,7 +91,7 @@ def write_deck(prompt, num_slides, topic, settings, conn):
             return True
         except Exception as e:
             status.update(label=tr("status_failed"), state="error")
-            st.error(tr("error", error=e))
+            show_error(e, conn)
             return False
 
 
@@ -106,7 +106,7 @@ def read_long_document(doc_text, topic, conn):
             )
         except Exception as e:
             status.update(label=tr("status_failed"), state="error")
-            st.error(tr("error", error=e))
+            show_error(e, conn)
             return None
         status.update(label=tr("status_done"), state="complete")
     st.info(tr("doc_digested", parts=used) if used == total else tr("doc_digested_partly", parts=used, total=total))
@@ -152,7 +152,7 @@ def handle_submit(form, conn):
                 status.update(label=tr("status_plan_done"), state="complete")
             except Exception as e:
                 status.update(label=tr("status_failed"), state="error")
-                st.error(tr("error", error=e))
+                show_error(e, conn)
         return
 
     prompt = build_prompt(topic=form.topic, doc_text=doc_text, tone=form.tone, text_amount=form.text_amount,

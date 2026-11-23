@@ -120,6 +120,22 @@ TEXTS = {
         "status_done": "Content is ready",
         "status_failed": "Generation failed",
         "error": "❌ An error occurred: {error}",
+        "error_details": "Technical details",
+        "err_bad_key": "🔑 {provider} did not accept the API key. Check that it was copied completely, without "
+                       "spaces, and that it is still active, or paste another one under **API keys** in the sidebar.",
+        "err_quota": "💳 The {provider} account has no credit or quota left. Top up the balance or check the plan "
+                     "in your {provider} account, or choose another AI in the sidebar.",
+        "err_rate_limit": "⏳ {provider} reports too many requests right now, or this period's quota is used up. "
+                          "Wait a minute and try again.",
+        "err_model_not_found": "🧩 {provider} does not know the model “{model}”. Check the name in the **Model** "
+                               "field, or leave it empty to use the default model.",
+        "err_overloaded": "🌩️ {provider} is overloaded or temporarily unavailable. The app already retried; try again "
+                          "in a few minutes or choose another AI.",
+        "err_network": "🌐 No connection to {provider}. Check the internet connection, a VPN or a proxy, and try again.",
+        "err_refused": "🚫 The AI declined to write this presentation. Try rephrasing the topic.",
+        "err_unusable_answer": "🤔 The AI's answers could not be turned into slides, even after several attempts. "
+                               "Try again, or choose another model.",
+        "err_unknown": "❌ Something went wrong: {error}",
         "build_error": "❌ Could not build the presentation: {error}",
         "unsplash_limit": (
             "Unsplash rejected some requests: the key is invalid or its hourly limit is used up, "
@@ -351,6 +367,22 @@ TEXTS = {
         "status_done": "Содержание готово",
         "status_failed": "Генерация не удалась",
         "error": "❌ Произошла ошибка: {error}",
+        "error_details": "Технические подробности",
+        "err_bad_key": "🔑 {provider} не принял API-ключ. Проверьте, что он скопирован целиком, без пробелов, и всё ещё "
+                       "действует, или вставьте другой в **API-ключи** на боковой панели.",
+        "err_quota": "💳 На аккаунте {provider} закончились деньги или квота. Пополните баланс или проверьте тариф "
+                     "в личном кабинете {provider}, либо выберите другой ИИ на боковой панели.",
+        "err_rate_limit": "⏳ {provider} сообщает о слишком большом числе запросов или об исчерпанной квоте на этот "
+                          "период. Подождите минуту и попробуйте снова.",
+        "err_model_not_found": "🧩 {provider} не знает модель «{model}». Проверьте название в поле **Модель** или "
+                               "оставьте его пустым, чтобы взять модель по умолчанию.",
+        "err_overloaded": "🌩️ {provider} перегружен или временно недоступен. Приложение уже повторило попытки; "
+                          "попробуйте через несколько минут или выберите другой ИИ.",
+        "err_network": "🌐 Нет связи с {provider}. Проверьте интернет, VPN или прокси и попробуйте снова.",
+        "err_refused": "🚫 ИИ отказался писать эту презентацию. Попробуйте сформулировать тему иначе.",
+        "err_unusable_answer": "🤔 Ответы ИИ не удалось превратить в слайды даже после нескольких попыток. "
+                               "Попробуйте ещё раз или выберите другую модель.",
+        "err_unknown": "❌ Что-то пошло не так: {error}",
         "build_error": "❌ Не удалось собрать презентацию: {error}",
         "unsplash_limit": (
             "Unsplash отклонил часть запросов: ключ неверный или исчерпан часовой лимит, "

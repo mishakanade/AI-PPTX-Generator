@@ -548,3 +548,18 @@ def test_a_long_document_is_read_whole_through_the_api(fakes, monkeypatch):
     assert seen["length"] == len(long_text.decode())                       # the whole text went in
     assert "the digest of everything" in fakes["prompt"]                  # the slides are written from it
     assert any("read in 4 parts" in i.value for i in app.info)
+
+
+def test_a_failed_generation_shows_advice_instead_of_the_raw_error(fakes, monkeypatch):
+    from google.genai import errors
+
+    def broken(prompt, **kwargs):
+        raise errors.ClientError(400, {"error": {"code": 400, "message": "API key not valid.", "status": "X"}})
+
+    monkeypatch.setattr(llm, "generate_deck", broken)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("x")
+    app.button(key="generate").click().run()
+    assert not app.exception
+    assert any("did not accept the API key" in e.value for e in app.error)
+    assert any(x.label == "Technical details" for x in app.expander)

@@ -39,7 +39,14 @@ def ask(model, prompt, schema, api_key):
         request["fallbacks"] = "default"
     client = get_client(api_key)
     if schema is not None:
-        response = client.beta.messages.parse(output_format=schema, **request)
+        try:
+            response = client.beta.messages.parse(output_format=schema, **request)
+        except anthropic.APIError:
+            raise
+        except Exception as e:
+            # the SDK could not read the answer into the schema: treat it like any unusable answer,
+            # so that it is asked again instead of failing at once
+            raise ContentError("The model returned an answer that does not match the format.") from e
     else:
         response = client.beta.messages.create(**request)
 
@@ -61,3 +68,22 @@ def classify(error):
     if isinstance(error, anthropic.BadRequestError):
         return "schema"
     return "fatal"
+
+
+def explain(error):
+    """What went wrong, as a code the interface turns into advice (see content/errors.py)."""
+    if isinstance(error, RefusalError):
+        return "refused"
+    if isinstance(error, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)):
+        return "bad_key"
+    if isinstance(error, anthropic.NotFoundError):
+        return "model_not_found"
+    if isinstance(error, anthropic.RateLimitError):
+        return "rate_limit"
+    if isinstance(error, anthropic.BadRequestError) and "credit balance" in str(error).lower():
+        return "quota"
+    if isinstance(error, anthropic.APIConnectionError):     # includes timeouts
+        return "network"
+    if isinstance(error, anthropic.APIStatusError) and error.status_code >= 500:
+        return "overloaded"
+    return None

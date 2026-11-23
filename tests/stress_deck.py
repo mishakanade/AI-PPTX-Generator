@@ -3,7 +3,16 @@
 IMG is a picture key that tests pass as downloaded; "missing" is one that is not.
 """
 from generator.content.schema import (
-    Card, Chart, ChartSeries, Column, Deck, Slide, Stat, Step, Table, TableRow,
+    Card,
+    Chart,
+    ChartSeries,
+    Column,
+    Deck,
+    Slide,
+    Stat,
+    Step,
+    Table,
+    TableRow,
 )
 
 LONG = ("Космическая гонка началась в 1957 году с запуска первого искусственного спутника Земли и быстро "

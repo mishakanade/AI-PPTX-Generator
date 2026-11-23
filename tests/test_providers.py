@@ -166,7 +166,8 @@ def test_claude_schema_rejection_retries_without_schema(server):
 
 
 def test_regenerating_one_slide_through_claude(server):
-    server.script.append((200, claude_answer(json.dumps({"type": "statement", "title": "Key", "subtitle": "One idea"}))))
+    one_slide = {"type": "statement", "title": "Key", "subtitle": "One idea"}
+    server.script.append((200, claude_answer(json.dumps(one_slide))))
     slide = llm.regenerate_slide("x", provider="claude", api_key="k")
     assert slide.type == "statement" and slide.subtitle == "One idea"
     assert server.requests[0]["body"]["output_config"]["format"]["type"] == "json_schema"
@@ -236,6 +237,7 @@ def test_claude_refusal_and_unusable_answers_become_advice(server):
 ])
 def test_gemini_errors_become_advice(status, message, code):
     from google.genai import errors
+
     from generator.content.errors import explain
     error_class = errors.ServerError if status >= 500 else errors.ClientError
     e = error_class(status, {"error": {"code": status, "message": message, "status": "X"}})
@@ -244,6 +246,7 @@ def test_gemini_errors_become_advice(status, message, code):
 
 def test_network_failures_become_advice():
     import httpx
+
     from generator.content.errors import explain
     assert explain(httpx.ConnectTimeout("timed out"), "gemini") == "network"
     assert explain(ValueError("strange"), "gemini") == "unknown"

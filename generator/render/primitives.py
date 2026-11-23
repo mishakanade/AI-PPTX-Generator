@@ -7,13 +7,12 @@ same list: pptx_backend.py into a .pptx file and html_backend.py into an HTML pr
 That is why the preview in the browser matches the downloaded file.
 """
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Union
 
 # Slide size in inches (16:9)
 SLIDE_W = 13.333
 SLIDE_H = 7.5
 
-Color = Tuple[int, int, int]
+Color = tuple[int, int, int]
 
 
 @dataclass
@@ -24,7 +23,7 @@ class Gradient:
     direction: str = "diagonal"   # "horizontal" (left to right), "vertical" (top to bottom), "diagonal"
 
 
-Fill = Union[Color, Gradient, None]
+Fill = Color | Gradient | None
 
 
 @dataclass
@@ -37,7 +36,7 @@ class Box:
     fill: Fill = None
     alpha: float = 1.0             # 1 = solid, 0 = invisible (only for plain colour fills)
     radius: float = 0.0            # corner radius in inches
-    line: Optional[Color] = None   # outline colour
+    line: Color | None = None   # outline colour
     line_width: float = 1.0        # outline width in points
     shadow: bool = False           # soft drop shadow
     ellipse: bool = False
@@ -47,13 +46,13 @@ class Box:
 class Para:
     """One paragraph inside a Text block. Empty settings are taken from the Text block."""
     text: str
-    size: Optional[float] = None
-    bold: Optional[bool] = None
-    italic: Optional[bool] = None
-    color: Optional[Color] = None
-    font: Optional[str] = None
+    size: float | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    color: Color | None = None
+    font: str | None = None
     bullet: bool = False
-    space_after: Optional[float] = None   # gap after the paragraph, in points
+    space_after: float | None = None   # gap after the paragraph, in points
 
 
 @dataclass
@@ -63,7 +62,7 @@ class Text:
     y: float
     w: float
     h: float
-    paragraphs: List[Para]
+    paragraphs: list[Para]
     font: str = "Calibri"
     size: float = 18               # in points
     color: Color = (0, 0, 0)
@@ -74,7 +73,7 @@ class Text:
     line_spacing: float = 1.0      # 1.0 = single spacing
     space_after: float = 0         # default gap after each paragraph, in points
     bullet_char: str = "•"
-    bullet_color: Optional[Color] = None
+    bullet_color: Color | None = None
 
 
 @dataclass
@@ -97,9 +96,9 @@ class ChartShape:
     w: float
     h: float
     kind: str                       # "column", "bar", "line" or "pie" (drawn as a doughnut)
-    categories: List[str]
-    series: List[Tuple[str, List[float]]]   # (name, one value per category)
-    colors: List[Color]             # one per series; for pie, one per category
+    categories: list[str]
+    series: list[tuple[str, list[float]]]   # (name, one value per category)
+    colors: list[Color]             # one per series; for pie, one per category
     text_color: Color
     grid_color: Color
     background: Color               # slide colour, used for the gaps between doughnut slices
@@ -140,5 +139,5 @@ class ChartShape:
 class SlideSpec:
     """Everything needed to draw one slide. Items are drawn in order, later ones on top."""
     background: Fill
-    items: List[Union[Box, Text, Picture, ChartShape]] = field(default_factory=list)
+    items: list[Box | Text | Picture | ChartShape] = field(default_factory=list)
     notes: str = ""                # speaker notes

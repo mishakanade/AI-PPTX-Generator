@@ -11,8 +11,8 @@ from generator.content.data import DataError, bind_data_charts, chart_options, d
 from generator.content.documents import DocumentReadError, extract_text_from_file
 from generator.content.prompt import MAX_DOC_CHARS, build_outline_prompt, build_prompt, build_review_prompt
 from generator.content.quality import check_deck, describe_for_model
-from generator.content.storytelling import DEFAULT_GOAL
 from generator.content.schema import SLIDE_TYPE_GUIDE, ContentError, Outline, OutlineSlide, parse_deck, parse_outline
+from generator.content.storytelling import DEFAULT_GOAL
 from generator.images import unsplash
 from interface.common import current_language, forget_presentation, safe_file_name, show_error, tr
 

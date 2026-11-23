@@ -1,7 +1,6 @@
 """The design section: colour theme (or custom colours), transition, logo and style cards."""
 import hashlib
 from dataclasses import dataclass
-from typing import Optional
 
 import streamlit as st
 
@@ -12,7 +11,13 @@ from generator.design.themes import THEMES
 from generator.render.builder import theme_colors
 from generator.render.logo import logo_aspect
 from interface.common import (
-    CUSTOM_THEME, current_language, sample_preview, show_slide, show_swatches, tr, tr_in,
+    CUSTOM_THEME,
+    current_language,
+    sample_preview,
+    show_slide,
+    show_swatches,
+    tr,
+    tr_in,
 )
 
 
@@ -22,8 +27,8 @@ class Design:
     style: str
     theme: object                 # a theme name, or a colour dict for custom colours
     theme_label: str              # how the theme is named in the result caption
-    transition: Optional[str]     # None, "fade", "push" or "wipe"
-    logo: Optional[bytes]
+    transition: str | None     # None, "fade", "push" or "wipe"
+    logo: bytes | None
 
     @property
     def key(self):

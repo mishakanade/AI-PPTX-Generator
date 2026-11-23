@@ -20,7 +20,7 @@ import pytest
 from generator.content.schema import ContentError, parse_deck, parse_digest, parse_outline, parse_slide
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_DECK_RU, SAMPLE_IMAGE, sample_photo
 from generator.design.styles import STYLES
-from generator.render.builder import build_preview, build_pptx, build_slides
+from generator.render.builder import build_pptx, build_preview, build_slides
 from generator.render.primitives import SLIDE_W, Picture, Text
 from tests.stress_deck import STRESS_DECK
 

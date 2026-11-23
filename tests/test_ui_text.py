@@ -13,7 +13,8 @@ def placeholders(text):
 def test_all_languages_have_the_same_texts_and_placeholders():
     english = ui_text.TEXTS["en"]
     for lang, texts in ui_text.TEXTS.items():
-        assert set(texts) == set(english), f"{lang}: missing {set(english) - set(texts)}, extra {set(texts) - set(english)}"
+        missing, extra = set(english) - set(texts), set(texts) - set(english)
+        assert not missing and not extra, f"{lang}: missing {missing}, extra {extra}"
         for key, text in texts.items():
             assert placeholders(text) == placeholders(english[key]), (lang, key)
 

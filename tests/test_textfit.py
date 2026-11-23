@@ -1,7 +1,12 @@
 """Predicting text size (generator/render/textfit.py)."""
 from generator.render.primitives import Para, Text
 from generator.render.textfit import (
-    best_scale, count_lines, fit, fit_single_line, text_height, text_width,
+    best_scale,
+    count_lines,
+    fit,
+    fit_single_line,
+    text_height,
+    text_width,
 )
 
 

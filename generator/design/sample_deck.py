@@ -10,7 +10,16 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 
 from generator.content.schema import (
-    Card, Chart, ChartSeries, Column, Deck, Slide, Stat, Step, Table, TableRow,
+    Card,
+    Chart,
+    ChartSeries,
+    Column,
+    Deck,
+    Slide,
+    Stat,
+    Step,
+    Table,
+    TableRow,
 )
 
 SAMPLE_IMAGE = "sample photo"   # the key under which the sample picture is passed to the renderer

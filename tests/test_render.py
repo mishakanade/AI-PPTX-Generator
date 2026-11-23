@@ -4,11 +4,10 @@ from io import BytesIO
 import pytest
 from pptx import Presentation
 
-from generator.export import find_soffice, to_pdf
-
 from generator.content.schema import Deck, Slide
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_IMAGE, sample_photo, sample_photo_url
 from generator.design.styles import STYLES
+from generator.export import find_soffice, to_pdf
 from generator.render.builder import build_pptx, build_preview
 
 

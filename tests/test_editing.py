@@ -1,7 +1,7 @@
 """Editing slides as text (generator/content/editing.py)."""
-from generator.content.editing import apply_edits, apply_text, slide_to_text
 import pytest
 
+from generator.content.editing import apply_edits, apply_text, slide_to_text
 from generator.design.sample_deck import SAMPLE_DECK, SAMPLE_DECK_RU
 
 

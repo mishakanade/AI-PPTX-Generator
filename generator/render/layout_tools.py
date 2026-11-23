@@ -1,6 +1,5 @@
 """Small building blocks shared by the styles and the slide layouts."""
 from dataclasses import dataclass
-from typing import List, Set
 
 from generator.design.colors import Palette
 from generator.render.primitives import Box, Para, Text
@@ -34,7 +33,7 @@ class Ctx:
     number: int             # position of the slide in the deck, the title slide is 1
     total: int              # number of slides in the deck
     deck_title: str
-    images: Set[str]        # keys of the pictures that were actually downloaded
+    images: set[str]        # keys of the pictures that were actually downloaded
     variant: int = 0        # 0 for the first slide of its type in the deck, 1 for the second...
     footer_reserve: float = 0.0   # inches kept free at the bottom of content areas (for a logo)
 
@@ -42,7 +41,7 @@ class Ctx:
 @dataclass
 class CardLook:
     """How a style draws one card: its shapes, where the text goes and which colours to use."""
-    items: List
+    items: list
     inner: Area
     heading_color: tuple
     text_color: tuple

@@ -9,7 +9,6 @@ model can therefore never reach a chart.
 import io
 import re
 from dataclasses import dataclass, field
-from typing import List
 
 import pandas as pd
 
@@ -41,7 +40,7 @@ class ChartOption:
     title: str                 # what the chart shows, for the model
     chart: Chart               # ready to draw, with the real numbers
     note: str = ""             # e.g. "the 8 largest of 15 rows"
-    columns: List[str] = field(default_factory=list)
+    columns: list[str] = field(default_factory=list)
 
 
 # ----- reading -------------------------------------------------------------------------------

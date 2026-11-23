@@ -1,7 +1,6 @@
 """Translations, small helpers and values shared by the interface modules."""
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 import streamlit as st
 
@@ -39,9 +38,9 @@ def current_settings():
 class Connection:
     """Who writes the content and with which keys, as chosen in the sidebar."""
     provider: str                 # "gemini", "openai", "claude" or "chat"
-    ai_key: Optional[str]         # None in chat mode or when no key is known
-    ai_model: Optional[str]       # None for the provider's default model
-    unsplash_key: Optional[str]
+    ai_key: str | None         # None in chat mode or when no key is known
+    ai_model: str | None       # None for the provider's default model
+    unsplash_key: str | None
 
     @property
     def info(self):

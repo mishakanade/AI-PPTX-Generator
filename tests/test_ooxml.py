@@ -72,7 +72,8 @@ def problems_in(xml):
     return found
 
 
-DECKS = {"sample": (SAMPLE_DECK, SAMPLE_IMAGE), "sample-ru": (SAMPLE_DECK_RU, SAMPLE_IMAGE), "stress": (STRESS_DECK, IMG)}
+DECKS = {"sample": (SAMPLE_DECK, SAMPLE_IMAGE), "sample-ru": (SAMPLE_DECK_RU, SAMPLE_IMAGE),
+         "stress": (STRESS_DECK, IMG)}
 
 
 @pytest.mark.parametrize("deck_name, style", list(itertools.product(DECKS, STYLES)))

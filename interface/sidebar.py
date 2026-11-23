@@ -11,8 +11,16 @@ from generator.content.storytelling import DEFAULT_GOAL, GOALS
 from generator.design.colors import to_hex
 from generator.project import load_project
 from interface.common import (
-    CUSTOM_THEME, DEFAULT_MODELS, PROVIDERS, Connection, current_language, forget_presentation, safe_file_name,
-    secret, tr, tr_in,
+    CUSTOM_THEME,
+    DEFAULT_MODELS,
+    PROVIDERS,
+    Connection,
+    current_language,
+    forget_presentation,
+    safe_file_name,
+    secret,
+    tr,
+    tr_in,
 )
 
 

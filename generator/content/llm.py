@@ -13,7 +13,15 @@ from generator.content.prompt import build_digest_prompt
 from generator.content.providers import PROVIDERS
 from generator.content.quality import check_deck, score
 from generator.content.schema import (
-    ContentError, Deck, Digest, Outline, Slide, parse_deck, parse_digest, parse_outline, parse_slide,
+    ContentError,
+    Deck,
+    Digest,
+    Outline,
+    Slide,
+    parse_deck,
+    parse_digest,
+    parse_outline,
+    parse_slide,
 )
 
 

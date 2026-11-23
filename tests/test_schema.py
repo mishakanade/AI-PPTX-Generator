@@ -19,7 +19,8 @@ def test_valid_answer_is_parsed():
 
 
 def test_text_around_json_is_ignored():
-    raw = "Here is your presentation:\n```json\n" + deck_json({"type": "bullets", "title": "A", "bullets": ["x"]}) + "\n```"
+    deck = deck_json({"type": "bullets", "title": "A", "bullets": ["x"]})
+    raw = "Here is your presentation:\n```json\n" + deck + "\n```"
     assert parse_deck(raw).slides[0].bullets == ["x"]
 
 

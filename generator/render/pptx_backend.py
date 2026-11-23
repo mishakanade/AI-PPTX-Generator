@@ -9,8 +9,8 @@ from io import BytesIO
 from lxml import etree
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
-from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_MARKER_STYLE, XL_TICK_MARK
 from pptx.dml.color import RGBColor
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_MARKER_STYLE, XL_TICK_MARK
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
@@ -188,7 +188,8 @@ def _number_format(item):
 def _no_fill_background(chart):
     """Make the chart area and the plot area transparent, so the slide shows through."""
     space = chart._chartSpace
-    for parent, anchor in ((space, space.find(qn("c:chart"))), (space.find(qn("c:chart")).find(qn("c:plotArea")), None)):
+    chart = space.find(qn("c:chart"))
+    for parent, anchor in ((space, chart), (chart.find(qn("c:plotArea")), None)):
         sp_pr = parent.find(qn("c:spPr"))
         if sp_pr is None:
             sp_pr = etree.SubElement(parent, qn("c:spPr"))

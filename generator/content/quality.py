@@ -10,7 +10,6 @@ and an English description for the model.
 """
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 from generator.content.presets import TEXT_AMOUNT_PRESETS
 
@@ -33,7 +32,7 @@ WORD = re.compile(r"[\w%$€£№]+", re.UNICODE)
 @dataclass
 class Issue:
     code: str
-    slide: Optional[int]        # index in deck.slides, or None for the whole deck
+    slide: int | None        # index in deck.slides, or None for the whole deck
     values: dict = field(default_factory=dict)
     detail: str = ""            # English, for the model
 
@@ -89,7 +88,8 @@ def check_deck(deck, text_amount="Balanced", speaker_notes=True):
         title_words = len(words(slide.title))
         if slide.type in POINT_TYPES and title_words <= 2:
             issues.append(Issue("title_label", i, {"title": slide.title},
-                                f'the title "{slide.title}" names a topic; state the slide\'s takeaway as a short sentence'))
+                                f'the title "{slide.title}" names a topic; '
+                                "state the slide's takeaway as a short sentence"))
         if title_words > 14:
             issues.append(Issue("title_long", i, {"words": title_words},
                                 f"the title has {title_words} words; keep it under 13"))
@@ -102,7 +102,8 @@ def check_deck(deck, text_amount="Balanced", speaker_notes=True):
         long_items = [t for t in _item_texts(slide) if len(words(t)) > amount["item_words"] * 1.5]
         if long_items:
             issues.append(Issue("long_items", i, {"count": len(long_items), "limit": amount["item_words"]},
-                                f"{len(long_items)} card/column/step texts are longer than {amount['item_words']} words"))
+                                f"{len(long_items)} card/column/step texts are longer than "
+                                f"{amount['item_words']} words"))
 
         text = " ".join(slide_texts(slide)).lower()
         for phrase in FILLER:

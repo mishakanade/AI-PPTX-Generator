@@ -1,0 +1,42 @@
+# Settings for the development tools. The app itself is not installed as a package:
+# it runs with `python -m streamlit run app.py` (see README.md).
+
+[project]
+name = "ai-pptx-generator"
+version = "0.1.0"
+description = "Turns a topic or a document into an editable PowerPoint presentation, with the AI of your choice"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# ruff reads the code and reports likely mistakes and untidy spots: names that are never
+# used, imports in a muddled order, old ways of writing things. Run: ruff check .
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["samples"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle: layout of the code
+    "F",        # pyflakes: unused names, undefined names, real mistakes
+    "B",        # bugbear: patterns that often hide bugs
+    "I",        # imports sorted the same way everywhere
+    "UP",       # newer, shorter spellings (list[str] instead of List[str], ...)
+    "SIM",      # simpler ways to write the same thing
+]
+ignore = [
+    "B008",     # lambda defaults are used on purpose: they fix a value (the language) at creation
+    "B905",     # zip() of lists that are equally long by construction
+    "SIM105",   # try/except/pass reads more plainly than contextlib.suppress
+]
+
+[tool.ruff.lint.per-file-ignores]
+# long texts and data: breaking these lines would only make them harder to read
+"ui_text.py" = ["E501"]
+"generator/content/prompt.py" = ["E501"]
+"generator/content/schema.py" = ["E501"]      # the guide of slide types, one line per type
+"generator/design/sample_deck.py" = ["E501"]
+"tests/stress_deck.py" = ["E501"]

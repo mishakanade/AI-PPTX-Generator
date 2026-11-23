@@ -7,8 +7,8 @@ from streamlit.testing.v1 import AppTest
 
 from generator import config
 from generator.content import llm
-from generator.images import unsplash
 from generator.design.sample_deck import sample_photo, sample_photo_url
+from generator.images import unsplash
 from tests.stress_deck import STRESS_DECK
 
 APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app.py")
@@ -117,6 +117,7 @@ def test_custom_colours_from_the_pickers(fakes):
     app.button(key="generate").click().run()
     assert not app.exception and not app.error
     from io import BytesIO
+
     from pptx import Presentation
     slide = Presentation(BytesIO(app.session_state["pptx_bytes"])).slides[0]
     assert str(slide.background.fill.fore_color.rgb) == "102030"
@@ -219,7 +220,8 @@ def test_copy_and_paste_mode_builds_the_deck_from_a_pasted_answer(fakes, monkeyp
     answer = {"title": "Космос", "subtitle": "Обзор", "slides": [
         {"type": "bullets", "title": f"Слайд {i}", "bullets": ["a", "b"], "image_keyword": "rocket launch"}
         for i in range(5)]}
-    app.text_area(key="chat_answer_deck").set_value("Конечно! Вот JSON:\n```json\n" + json.dumps(answer, ensure_ascii=False) + "\n```")
+    reply = "Конечно! Вот JSON:\n```json\n" + json.dumps(answer, ensure_ascii=False) + "\n```"
+    app.text_area(key="chat_answer_deck").set_value(reply)
     app.button(key="chat_build_deck").click().run()
     assert not app.exception and not app.error
     deck = app.session_state["deck"]
@@ -339,6 +341,7 @@ def test_another_photo_and_remove_photo(fakes, monkeypatch):
 
 def test_choosing_a_transition_redraws_the_file(fakes):
     from io import BytesIO
+
     from pptx import Presentation
     app = generated_app(fakes)
     app.selectbox(key="transition").set_value("wipe").run()
@@ -350,8 +353,10 @@ def test_choosing_a_transition_redraws_the_file(fakes):
 
 def test_a_logo_is_added_to_every_slide_and_saved_with_the_project(fakes):
     from io import BytesIO
+
     from PIL import Image
     from pptx import Presentation
+
     from generator.project import load_project, save_project
     buffer = BytesIO()
     Image.new("RGBA", (300, 100), (200, 0, 0, 255)).save(buffer, "PNG")

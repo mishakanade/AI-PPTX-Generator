@@ -172,7 +172,8 @@ def test_unreadable_documents_raise_a_clear_error(name, data, reason):
 
 def test_regenerate_slide_parses_one_slide(fake_model):
     calls, script = fake_model
-    script.append('{"type": "cards", "title": "New", "cards": [{"heading": "A", "text": "a"}, {"heading": "B", "text": "b"}]}')
+    script.append(json.dumps({"type": "cards", "title": "New",
+                              "cards": [{"heading": "A", "text": "a"}, {"heading": "B", "text": "b"}]}))
     slide = llm.regenerate_slide("prompt")
     assert slide.type == "cards" and [c.heading for c in slide.cards] == ["A", "B"]
 

@@ -17,7 +17,14 @@ from generator.project import save_project
 from generator.render.builder import build_pptx, build_preview
 from interface import generation
 from interface.common import (
-    UNSPLASH_LINK, current_language, current_settings, plain, sample_preview, show_error, show_slides, tr,
+    UNSPLASH_LINK,
+    current_language,
+    current_settings,
+    plain,
+    sample_preview,
+    show_error,
+    show_slides,
+    tr,
 )
 
 
@@ -171,7 +178,8 @@ def _fix_by_chat(deck, issues, settings):
     prompt = build_review_prompt(deck, describe_for_model(issues), settings["tone"], settings["text_amount"],
                                  settings["speaker_notes"], for_chat=True, **generation.brief(settings))
     st.code(prompt, language=None, wrap_lines=True, height=220)
-    answer = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"), key=f"fix_chat_answer_{version}")
+    answer = st.text_area(tr("chat_answer"), placeholder=tr("chat_answer_placeholder"),
+                          key=f"fix_chat_answer_{version}")
     if not st.button(tr("fix_chat_apply"), key="fix_chat_apply"):
         return
     if not answer.strip():

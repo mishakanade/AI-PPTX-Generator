@@ -19,7 +19,15 @@ The names of the slide types and the hints shown next to the text box are in ui_
 import re
 
 from generator.content.schema import (
-    Card, Column, Deck, Slide, Stat, Step, Table, TableRow, normalize_deck,
+    Card,
+    Column,
+    Deck,
+    Slide,
+    Stat,
+    Step,
+    Table,
+    TableRow,
+    normalize_deck,
 )
 
 # "Heading — text": a dash with spaces around it separates the two parts. Without the spaces it

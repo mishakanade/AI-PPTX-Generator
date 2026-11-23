@@ -70,6 +70,7 @@ CASES = list(itertools.product(DECKS, STYLES, THEMES))
 
 def logo_png(width, height):
     from io import BytesIO
+
     from PIL import Image
     buffer = BytesIO()
     Image.new("RGBA", (width, height), (200, 30, 30, 255)).save(buffer, "PNG")

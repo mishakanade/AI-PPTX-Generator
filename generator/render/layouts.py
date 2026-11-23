@@ -14,8 +14,16 @@ from generator.render.primitives import SLIDE_H as H
 from generator.render.primitives import SLIDE_W as W
 from generator.render.primitives import Box, ChartShape, Para, Picture, SlideSpec, Text
 from generator.render.textfit import (
-    POINTS_PER_INCH, apply_scale, best_scale, count_lines, fit, fit_single_line, line_height,
-    simple_text, text_height, text_width,
+    POINTS_PER_INCH,
+    apply_scale,
+    best_scale,
+    count_lines,
+    fit,
+    fit_single_line,
+    line_height,
+    simple_text,
+    text_height,
+    text_width,
 )
 
 GAP = 0.4   # space between cards and columns, in inches

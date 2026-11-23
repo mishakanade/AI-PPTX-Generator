@@ -6,7 +6,11 @@ import pandas as pd
 import pytest
 
 from generator.content.data import (
-    DataError, bind_data_charts, chart_options, describe_for_prompt, read_tables,
+    DataError,
+    bind_data_charts,
+    chart_options,
+    describe_for_prompt,
+    read_tables,
 )
 from generator.content.schema import parse_deck
 

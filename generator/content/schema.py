@@ -10,7 +10,7 @@ These classes do two jobs:
 import json
 import math
 import re
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -39,7 +39,7 @@ SLIDE_TYPE_GUIDE = {
 
 class Column(BaseModel):
     heading: str = Field(description="Short column heading")
-    bullets: List[str] = Field(description="2-4 short points")
+    bullets: list[str] = Field(description="2-4 short points")
 
 
 class Card(BaseModel):
@@ -59,45 +59,45 @@ class Step(BaseModel):
 
 class ChartSeries(BaseModel):
     name: str = Field(description="What this series measures, e.g. a year or a country")
-    values: List[float] = Field(description="Exactly one number per category, without units")
+    values: list[float] = Field(description="Exactly one number per category, without units")
 
 
 class Chart(BaseModel):
     kind: Literal["column", "bar", "line", "pie"]
-    categories: List[str]
-    series: List[ChartSeries]
-    unit: Optional[str] = Field(default=None, description='Unit of the numbers, such as "%" or "bn $"')
+    categories: list[str]
+    series: list[ChartSeries]
+    unit: str | None = Field(default=None, description='Unit of the numbers, such as "%" or "bn $"')
 
 
 class TableRow(BaseModel):
-    cells: List[str]
+    cells: list[str]
 
 
 class Table(BaseModel):
-    headers: List[str]
-    rows: List[TableRow]
+    headers: list[str]
+    rows: list[TableRow]
 
 
 class Slide(BaseModel):
     type: SlideType
     title: str = Field(description="Slide title, up to 8 words")
-    subtitle: Optional[str] = None
-    bullets: Optional[List[str]] = None
-    image_keyword: Optional[str] = Field(
+    subtitle: str | None = None
+    bullets: list[str] | None = None
+    image_keyword: str | None = Field(
         default=None, description="2-4 English words naming something that can be photographed"
     )
-    columns: Optional[List[Column]] = None
-    cards: Optional[List[Card]] = None
-    stats: Optional[List[Stat]] = None
-    steps: Optional[List[Step]] = None
-    quote: Optional[str] = None
-    author: Optional[str] = None
-    table: Optional[Table] = None
-    chart: Optional[Chart] = None
-    data_ref: Optional[str] = Field(
+    columns: list[Column] | None = None
+    cards: list[Card] | None = None
+    stats: list[Stat] | None = None
+    steps: list[Step] | None = None
+    quote: str | None = None
+    author: str | None = None
+    table: Table | None = None
+    chart: Chart | None = None
+    data_ref: str | None = Field(
         default=None, description='Id of a prepared chart built from the user\'s data, e.g. "D1"; only when offered'
     )
-    notes: Optional[str] = Field(
+    notes: str | None = Field(
         default=None, description="What the presenter says on this slide: 2-4 sentences, not a copy of the slide"
     )
 
@@ -105,26 +105,26 @@ class Slide(BaseModel):
 class Deck(BaseModel):
     title: str
     subtitle: str
-    slides: List[Slide]
-    notes: Optional[str] = Field(default=None, description="What the presenter says on the title slide")
+    slides: list[Slide]
+    notes: str | None = Field(default=None, description="What the presenter says on the title slide")
 
 
 class OutlineSlide(BaseModel):
     type: SlideType
     title: str = Field(description="Slide title, up to 8 words")
-    focus: Optional[str] = Field(default=None, description="What the slide will say, one sentence")
+    focus: str | None = Field(default=None, description="What the slide will say, one sentence")
 
 
 class Outline(BaseModel):
     """The plan of a presentation: one line per slide, before any slide is written."""
     title: str
     subtitle: str
-    slides: List[OutlineSlide]
+    slides: list[OutlineSlide]
 
 
 class Digest(BaseModel):
     """The essentials of one part of a long document."""
-    points: List[str] = Field(description="Key facts, numbers, definitions and quotations, one per item")
+    points: list[str] = Field(description="Key facts, numbers, definitions and quotations, one per item")
 
 
 class ContentError(Exception):
@@ -247,9 +247,7 @@ def _normalize_slide(slide):
         parts = _clean_list(slide.bullets, 6)
         if len(parts) >= 2:
             return Slide(**data, bullets=parts)
-    elif kind == "image":
-        return Slide(**data)
-    elif kind == "section":
+    elif kind == "image" or kind == "section":
         return Slide(**data)
     elif kind == "closing":
         return Slide(**data, bullets=_clean_list(slide.bullets, 4) or None)

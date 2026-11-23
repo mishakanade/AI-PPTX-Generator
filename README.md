@@ -189,6 +189,14 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
+Before a commit, let `ruff` look over the code for likely mistakes (unused or undefined
+names, imports out of order, and so on; the rules are in `pyproject.toml`).
+`--fix` repairs what can be repaired safely:
+
+```bash
+ruff check . --fix
+```
+
 The tests check, among other things, that on every slide type, in every style, text and
 photos stay on the slide, every text fits its box and no texts overlap. They also run on
 GitHub for every push.

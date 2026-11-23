@@ -440,6 +440,10 @@ def layout_chart(ctx, slide):
     style, p = ctx.style, ctx.palette
     items, area = style.frame(ctx, slide.title)
     chart = slide.chart
+    if chart is None:
+        # a chart that was never filled with data (data.bind_data_charts was not run): its text as bullets
+        return layout_bullets(ctx, slide.model_copy(update={"type": "bullets", "subtitle": None,
+                                                            "bullets": [slide.subtitle or slide.title]}))
     colors = series_colors(p, len(chart.categories) if chart.kind == "pie" else len(chart.series))
 
     chart_w = area.w

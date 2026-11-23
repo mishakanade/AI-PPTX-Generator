@@ -8,6 +8,7 @@ These classes do two jobs:
      turned into a plain bullet slide by `normalize_deck`, so the renderer can trust the data.
 """
 import json
+import math
 import re
 from typing import List, Literal, Optional
 
@@ -138,8 +139,25 @@ def _clean(text):
     return " ".join(str(text or "").split())
 
 
+TITLE_LIMIT = 160     # characters; a title is a short sentence, longer ones would fill the slide
+
+
+def _short(text, limit):
+    """The text cut to `limit` characters at a word boundary, with "…" where it was cut."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1]
+    if " " in cut[limit // 2:]:
+        cut = cut[:cut.rindex(" ")]
+    return cut.rstrip(" ,;:.-–—") + "…"
+
+
 def _clean_list(items, limit):
-    cleaned = [_clean(item) for item in (items or [])]
+    if isinstance(items, str):
+        items = [items]                      # one text where a list was expected
+    elif not isinstance(items, (list, tuple)):
+        items = []                           # a number, true/false, an object: nothing usable
+    cleaned = [_clean(item) for item in items]
     return [item for item in cleaned if item][:limit]
 
 
@@ -169,7 +187,7 @@ def _normalize_slide(slide):
     """Return a copy of the slide that is guaranteed to have what its layout needs."""
     data = {
         "type": slide.type,
-        "title": _clean(slide.title) or "Slide",
+        "title": _short(_clean(slide.title), TITLE_LIMIT) or "Slide",
         "subtitle": _clean(slide.subtitle) or None,
         "image_keyword": _clean(slide.image_keyword) or None,
         "notes": _clean(slide.notes) or None,
@@ -248,7 +266,9 @@ def _normalize_slide(slide):
 def _normalize_chart(chart):
     """Return a chart whose series all have one value per category, or None if that is impossible."""
     categories = _clean_list(chart.categories, 8)
-    series = [s for s in chart.series if s.values][: 1 if chart.kind == "pie" else 3]
+    # a value like 1e308 or Infinity cannot be drawn (and sums of them overflow): such a series is left out
+    series = [s for s in chart.series if s.values and all(math.isfinite(v) and abs(v) < 1e15 for v in s.values)]
+    series = series[: 1 if chart.kind == "pie" else 3]
     if not categories or not series:
         return None
     # cut everything to the shortest list: a missing value must not be invented
@@ -266,7 +286,7 @@ def _normalize_chart(chart):
 def normalize_deck(deck):
     """Repair a deck so that every slide can be drawn by its layout."""
     return Deck(
-        title=_clean(deck.title) or "Presentation",
+        title=_short(_clean(deck.title), TITLE_LIMIT) or "Presentation",
         subtitle=_clean(deck.subtitle),
         notes=_clean(deck.notes) or None,
         slides=[_normalize_slide(slide) for slide in deck.slides],
@@ -277,7 +297,8 @@ def _repair_chart_numbers(chart):
     """Turn chart values like "12,5%" into 12.5 (only needed when the strict schema was not used)."""
     if not isinstance(chart, dict):
         return
-    for series in chart.get("series") or []:
+    series_list = chart.get("series")
+    for series in series_list if isinstance(series_list, list) else []:
         if not isinstance(series, dict) or not isinstance(series.get("values"), list):
             continue
         numbers = []
@@ -289,6 +310,11 @@ def _repair_chart_numbers(chart):
                 value = float(match.group(0).replace(" ", "").replace(",", "."))
             numbers.append(value)
         series["values"] = numbers
+
+
+def _known_type(value):
+    """True for the name of a slide type. A model may put anything there, even a list."""
+    return isinstance(value, str) and value in SLIDE_TYPE_GUIDE
 
 
 def parse_deck(raw_text):
@@ -307,10 +333,11 @@ def parse_deck(raw_text):
     if isinstance(data, dict):
         data.setdefault("title", "")
         data.setdefault("subtitle", "")
-    for slide in data.get("slides", []) if isinstance(data, dict) else []:
+    slides = data.get("slides") if isinstance(data, dict) else None
+    for slide in slides if isinstance(slides, list) else []:
         if isinstance(slide, dict):
             slide.setdefault("title", "")
-            if slide.get("type") not in SLIDE_TYPE_GUIDE:
+            if not _known_type(slide.get("type")):
                 slide["type"] = "bullets"
             if "bullets" not in slide and isinstance(slide.get("content"), list):
                 slide["bullets"] = slide["content"]
@@ -359,7 +386,7 @@ def parse_outline(raw_text):
     for item in data["slides"][:25]:
         if not isinstance(item, dict) or not _clean(item.get("title")):
             continue
-        kind = item.get("type") if item.get("type") in SLIDE_TYPE_GUIDE else "bullets"
+        kind = item.get("type") if _known_type(item.get("type")) else "bullets"
         slides.append(OutlineSlide(type=kind, title=_clean(item["title"]), focus=_clean(item.get("focus")) or None))
     if not slides:
         raise ContentError("The model returned a plan without slides. Please try again.")

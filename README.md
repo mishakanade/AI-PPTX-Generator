@@ -193,6 +193,10 @@ The tests check, among other things, that on every slide type, in every style, t
 photos stay on the slide, every text fits its box and no texts overlap. They also run on
 GitHub for every push.
 
+`tests/test_fuzz.py` damages valid presentations at random, hundreds of times (wrong types,
+missing fields, cut-off answers, prose around the JSON), and checks that every answer is either
+repaired and drawn or refused with a clear message, never a crash.
+
 Those checks trust the engine's own text measurements. `tests/test_rendering.py` checks
 them against a real renderer: LibreOffice draws every style, and the PDF is read back to
 see where each line actually landed (outside its box, overlapping, or missing). It runs

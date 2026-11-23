@@ -197,6 +197,7 @@ tools/
   render_samples.py          saves the example deck in every style to samples/
   build_font_metrics.py      regenerates font_metrics.json
   readme_images.py           makes docs/images/slides.jpg, the example slides above
+  evaluate.py                compares the app with a plain "make a presentation" request
 .streamlit/config.toml       look of the interface
 Dockerfile                   the app in a container, LibreOffice included
 pyproject.toml               settings of the development tools (pytest, ruff)
@@ -244,6 +245,22 @@ python tools/render_samples.py --theme "Dark Modern"
 
 Add `--stress` for a deck of deliberately long texts, and `--pdf` to also get PDF files
 (needs LibreOffice).
+
+### Is it better than just asking a chat?
+
+`tools/evaluate.py` answers that with numbers. For each of a set of topics (built in, or your
+own file) the same model writes two presentations: one from a plain "make a presentation about
+X" request, one the app's way. Both are measured by the app's automatic check, and then a
+judge model scores them on message, storyline, specifics, fit for the audience and slide
+design, without knowing which is which, twice, with the order swapped. It needs an API key
+and makes about seven requests per topic:
+
+```bash
+python tools/evaluate.py --provider gemini --judge-provider claude --limit 3
+```
+
+The report is written to `evaluation/report.md`, with both presentations of every topic next
+to it (`--pptx` also draws them).
 
 ### Adding a design style
 

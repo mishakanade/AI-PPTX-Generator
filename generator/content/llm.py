@@ -71,6 +71,15 @@ def trim_slides(slides, limit):
     return slides[:limit]
 
 
+def ask(prompt, schema, parse, retries_per_model=2, api_key=None, provider="gemini", model=None):
+    """Any structured request: parse(answer) is returned, with the same retries as generate_deck.
+
+    schema is the pydantic class of the answer; parse turns the raw text into the result and
+    raises ContentError for an unusable answer (which is then asked again).
+    """
+    return _request(prompt, schema, parse, provider, _key(provider, api_key), model, retries_per_model)
+
+
 def generate_deck(prompt, max_slides=None, retries_per_model=2, api_key=None, provider="gemini", model=None):
     """Ask a model for a presentation and return it as a checked Deck.
 

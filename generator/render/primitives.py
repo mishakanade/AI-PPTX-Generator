@@ -74,6 +74,8 @@ class Text:
     space_after: float = 0         # default gap after each paragraph, in points
     bullet_char: str = "•"
     bullet_color: Color | None = None
+    decorative: bool = False       # an ornament (a huge pale number): not read aloud, not held to
+                                   # the contrast rules for text that must be read
 
 
 @dataclass

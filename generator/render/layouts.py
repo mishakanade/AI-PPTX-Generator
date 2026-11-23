@@ -188,10 +188,12 @@ def layout_image(ctx, slide):
     text = Text(M, 0.9, 9.6, H - 2.45, paragraphs, font=style.body_font, size=22, color=(236, 236, 236),
                 valign="bottom")
     items = [Picture(0, 0, W, H, key),
-             Box(0, 0, W, H, fill=(0, 0, 0), alpha=0.5),   # dark veil so white text stays readable
+             # dark veil so white text stays readable: at 55 % even a white photo (snow, sky) becomes
+             # a grey dark enough for small white text (WCAG contrast 4.5, checked by test_rendering)
+             Box(0, 0, W, H, fill=(0, 0, 0), alpha=0.55),
              text,
              Box(M, H - 1.15, 1.2, 0.08, fill=p.accent)]
-    items.append(style.page_number(ctx, (220, 220, 220)))
+    items.append(style.page_number(ctx, WHITE))
     return SlideSpec((0, 0, 0), items)
 
 

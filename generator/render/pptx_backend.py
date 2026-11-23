@@ -148,6 +148,8 @@ def _draw_text(slide, block, is_title=False):
     shape = slide.shapes.add_textbox(Inches(block.x), Inches(block.y), Inches(block.w), Inches(block.h))
     if is_title:
         _make_title(shape)
+    elif block.decorative:
+        _mark_decorative(shape._element.nvSpPr.cNvPr)
     frame = shape.text_frame
     frame.word_wrap = True
     frame.auto_size = MSO_AUTO_SIZE.NONE

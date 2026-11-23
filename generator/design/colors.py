@@ -126,7 +126,8 @@ def make_palette(theme):
         surface=surface,
         surface_strong=surface_strong,
         accent_soft=mix(bg, accent, 0.14),
-        muted=ensure_contrast(mix(text, bg, 0.38), bg, toward=text),
+        # small text (captions, page numbers): WCAG asks 4.5 for text this size
+        muted=ensure_contrast(mix(text, bg, 0.38), bg, toward=text, target=4.5),
         line=mix(bg, text, 0.22),
         on_accent=readable_on(accent),
         deep=deep,

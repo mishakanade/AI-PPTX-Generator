@@ -9,7 +9,7 @@ Each style is a class with the same set of methods (see `Style`). The slide layo
 in render/layouts.py call these methods and never need to know which style is active.
 To add a style: subclass `Style`, override what should differ, add it to STYLES.
 """
-from generator.design.colors import WHITE, mix
+from generator.design.colors import WHITE, ensure_contrast, mix
 from generator.render.layout_tools import MARGIN as M
 from generator.render.layout_tools import Area, CardLook, heading, measured, rule, shorten, stack
 from generator.render.primitives import SLIDE_H as H
@@ -163,7 +163,7 @@ class Editorial(Style):
         p = ctx.palette
         items = [rule(left, 0.6, right - left, p.title, 0.025),
                  simple_text(left, 0.74, 1.5, 0.3, f"{ctx.number:02d}", font=self.body_font, size=12,
-                             bold=True, color=p.accent)]
+                             bold=True, color=ensure_contrast(p.accent, p.bg, p.title, 4.5))]   # small: 4.5
         if with_title:
             # the deck title takes the rest of the line after the number, right-aligned
             start = left + 1.6
@@ -294,7 +294,8 @@ class Soft(Style):
         p, left, right = ctx.palette, left or M, right or W - M
         pill = [Box(left, 0.6, 1.25, 0.38, fill=p.accent_soft, radius=0.19),
                 simple_text(left, 0.6, 1.25, 0.38, f"{ctx.number:02d} / {ctx.total:02d}", font=self.body_font,
-                            size=11, bold=True, color=p.accent, align="center", valign="middle")]
+                            size=11, bold=True, color=ensure_contrast(p.accent, p.accent_soft, p.title, 4.5),
+                            align="center", valign="middle")]
         t = heading(title, left, 1.18, right - left, self.heading_font, 32, p.title)
         top = t.y + t.h + 0.42
         return self.decorate(ctx) + pill + [t], Area(left, top, right - left, self.bottom(ctx, 6.85) - top)
@@ -328,7 +329,8 @@ class Soft(Style):
         if kind == "section":
             pill = tag[0][0]
             items.append(simple_text(pill.x, pill.y, pill.w, pill.h, f"{ctx.number:02d}", font=self.body_font,
-                                     size=13, bold=True, color=p.on_accent, align="center", valign="middle"))
+                                     # 14 pt bold counts as large text (contrast 3 is enough on any accent)
+                                     size=14, bold=True, color=p.on_accent, align="center", valign="middle"))
         return SlideSpec(self.background(ctx), items)
 
 
@@ -355,7 +357,7 @@ class Bold(Style):
         p = ctx.palette
         # 2.2 in wide: enough for two digits, and exactly the room the title leaves free
         return simple_text(right - 2.2, 0.3, 2.2, 1.5, f"{ctx.number:02d}", font=self.heading_font, size=84,
-                           bold=True, color=mix(p.bg, p.accent, 0.3), align="right")
+                           bold=True, color=mix(p.bg, p.accent, 0.3), align="right", decorative=True)
 
     def decorate(self, ctx):
         return [self._big_number(ctx, W - M)]
@@ -400,7 +402,8 @@ class Bold(Style):
             number = f"{ctx.number:02d}"
             number_w = text_width(number, self.heading_font, 130, bold=True) * 1.1
             items.append(simple_text(W - M - number_w, 0.5, number_w, 2.3, number, font=self.heading_font,
-                                     size=130, bold=True, color=mix(p.accent, ink, 0.3), align="right"))
+                                     size=130, bold=True, color=mix(p.accent, ink, 0.3), align="right",
+                                     decorative=True))
         # the text is pinned to the bottom of its box and grows upwards; the bar sits under it
         text = self.cover_text(ctx, kind, title, subtitle, bullets, M, 9.4, ink,
                                mix(ink, p.accent, 0.15), ink, ink)

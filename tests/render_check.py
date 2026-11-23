@@ -154,3 +154,75 @@ def render_problems(specs, images):
         return [(0, f"the PDF has {len(document)} pages for {len(specs)} slides")]
     return [(number, problem) for number, (spec, page) in enumerate(zip(specs, document), 1)
             for problem in page_problems(spec, page)]
+
+
+# ----- contrast: can the text be read against what is really behind it? ----------------------
+#
+# The slide is drawn twice: as it is, and without any text. In the second drawing the pixels
+# under every line of text are exactly its background (a colour, a gradient, a photo, a
+# shaded overlay), so the contrast can be measured the way the WCAG rules for readable text
+# define it. The darkest-against-lightest worst 5 % of the background pixels count, so a
+# bright patch of a photo behind white text is noticed even if most of the photo is dark.
+
+ZOOM = 2                       # pixels per PDF point in the background picture
+NORMAL_TEXT, LARGE_TEXT = 4.5, 3.0   # WCAG AA: minimum contrast for normal and for large text
+
+
+def luminance(rgb):
+    """Relative luminance (0 black - 1 white) of colours given as 0-255 values, as WCAG defines it."""
+    import numpy as np
+    c = np.asarray(rgb, dtype=float) / 255
+    c = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    return c[..., 0] * 0.2126 + c[..., 1] * 0.7152 + c[..., 2] * 0.0722
+
+
+def contrast(l1, l2):
+    """The contrast ratio of two luminances: 1 (none) to 21 (black on white)."""
+    import numpy as np
+    return (np.maximum(l1, l2) + 0.05) / (np.minimum(l1, l2) + 0.05)
+
+
+def contrast_problems(specs, images):
+    """[(slide number, problem)] for text that is too faint against its real background."""
+    import copy
+
+    import numpy as np
+    import pymupdf
+    bare = []
+    for spec in specs:
+        copy_ = copy.copy(spec)
+        copy_.items = [item for item in spec.items if not isinstance(item, Text)]
+        bare.append(copy_)
+    drawn = pymupdf.open(stream=to_pdf(specs_to_pptx(specs, images)))
+    backgrounds = pymupdf.open(stream=to_pdf(specs_to_pptx(bare, images)))
+    problems = []
+    for number, (spec, page, background) in enumerate(zip(specs, drawn, backgrounds), 1):
+        texts = [item for item in spec.items if isinstance(item, Text)]
+        charts = [item for item in spec.items if isinstance(item, ChartShape)]
+        pixmap = background.get_pixmap(matrix=pymupdf.Matrix(ZOOM, ZOOM))
+        pixels = np.frombuffer(pixmap.samples, np.uint8).reshape(pixmap.h, pixmap.w, pixmap.n)[..., :3]
+        for block in page.get_text("dict")["blocks"]:
+            for line in block.get("lines", []):
+                for span in line["spans"]:
+                    text = span["text"].strip()
+                    if not text.strip(BULLET_CHARS):
+                        continue
+                    x0, y0, x1, y1 = (v / PT for v in span["bbox"])
+                    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+                    if any(c.x <= cx <= c.x + c.w and c.y <= cy <= c.y + c.h for c in charts):
+                        continue                    # chart labels are LibreOffice's own business
+                    box = owner(Span(text, x0, y0, x1, y1, span["size"]), texts)
+                    if box is not None and (box.decorative or decoration(box)):
+                        continue
+                    left, top, right, bottom = (max(0, round(v * ZOOM)) for v in span["bbox"])
+                    under = pixels[top:bottom, left:right].reshape(-1, 3)
+                    if not len(under):
+                        continue
+                    color = span["color"]
+                    ink = luminance(((color >> 16) & 255, (color >> 8) & 255, color & 255))
+                    worst = float(np.percentile(contrast(ink, luminance(under)), 5))
+                    large = span["size"] >= 18 or (span["size"] >= 14 and span["flags"] & 16)   # 16: bold
+                    needed = LARGE_TEXT if large else NORMAL_TEXT
+                    if worst < needed:
+                        problems.append((number, f"contrast {worst:.1f} (needs {needed}) for {text[:40]!r}"))
+    return problems

@@ -54,6 +54,8 @@ The project is in alpha and is built solo, so expect changes.
 - **Accessible files.** Every slide has a real PowerPoint title (shown in the outline view and
   the slide list, announced by screen readers), photos carry alternative text, and decorative
   shapes are marked as such, so PowerPoint's accessibility check has nothing to report.
+  Every text meets the WCAG contrast rules against what is really behind it, in all
+  32 themes, even over a white or a black photo.
 - **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
   PowerPoint's presenter view. Photo credits are added to the notes as well.
 - **Instant redesign.** After generation, pick another style or theme: the file is redrawn
@@ -238,7 +240,9 @@ them against a real renderer: LibreOffice draws every style, and the PDF is read
 see where each line actually landed (outside its box, overlapping, or missing). It runs
 where LibreOffice, `pymupdf` and the free twins of the Office fonts are installed
 (on Ubuntu: `libreoffice-impress fonts-crosextra-carlito fonts-liberation`), and on GitHub
-in a job of its own; elsewhere it is skipped.
+in a job of its own; elsewhere it is skipped. The same test measures the contrast of every
+line of text against the real pixels behind it (the slide drawn once more without text), with
+the hardest photos: plain white and plain black.
 
 To look at the designs without API keys, save the example deck in every style:
 

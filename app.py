@@ -12,7 +12,8 @@ from generator.design.styles import DEFAULT_STYLE
 from interface import design, generation, result, sidebar
 from interface.common import browser_language, tr
 
-st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide")
+# the sidebar holds the form, so it starts open: on a phone it would otherwise be hidden
+st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 st.session_state.setdefault("lang", browser_language())
 st.session_state.setdefault("style", DEFAULT_STYLE)
 

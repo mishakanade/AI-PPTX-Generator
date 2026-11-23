@@ -52,7 +52,9 @@ def design_section():
         logo = _logo_choice()
 
     st.markdown(f"**{tr('style')}**")
-    for column, (style_key, style) in zip(st.columns(len(STYLES)), STYLES.items()):
+    st.html(PHONE_CARDS_CSS)
+    cards = st.container(key="style_cards")       # the key gives the CSS above a name to aim at
+    for column, (style_key, style) in zip(cards.columns(len(STYLES)), STYLES.items()):
         with column, st.container(border=True):
             # each card shows the real title slide of the example deck in this style and theme
             show_slide(sample_preview(style_key, theme, lang)[0])
@@ -113,6 +115,18 @@ def _logo_choice():
     return logo
 
 
+# On a phone Streamlit puts columns under each other, so five style cards would take five
+# screens of scrolling. Narrower than 640 px, the cards go two to a row, without descriptions.
+PHONE_CARDS_CSS = """<style>
+@media (max-width: 640px) {
+  .st-key-style_cards [data-testid="stHorizontalBlock"] { flex-wrap: wrap; gap: 0.5rem; }
+  .st-key-style_cards [data-testid="stColumn"] {
+    flex: 0 1 calc(50% - 0.5rem) !important; min-width: calc(50% - 0.5rem) !important;
+    width: calc(50% - 0.5rem) !important;
+  }
+  .st-key-style_cards [data-testid="stCaptionContainer"] { display: none; }
+}
+</style>"""
 LOGO_SIDE = 1200   # pixels; plenty for a logo in a corner, even on a large screen
 
 

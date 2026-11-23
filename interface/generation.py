@@ -113,8 +113,30 @@ def read_long_document(doc_text, topic, conn):
     return digest
 
 
+# After "Generate" the answer (a warning, the progress, the result) appears below the design
+# section, often out of sight. This scrolls to it; and on a phone, where the sidebar lies over
+# the page, it first closes the sidebar. On a computer, where the sidebar sits beside the page,
+# the sidebar stays as it is.
+SHOW_THE_ANSWER = """<script>
+const root = window.parent.document.querySelector('[data-testid="stSidebar"]') ? window.parent.document : document;
+const sidebar = root.querySelector('[data-testid="stSidebar"]');
+if (sidebar && sidebar.getBoundingClientRect().width > window.innerWidth * 0.6) {
+  root.querySelector('[data-testid="stSidebarCollapseButton"] button')?.click();
+}
+setTimeout(() => {
+  const answer = root.querySelector('.st-key-answer');
+  if (answer) {
+    answer.style.scrollMarginTop = '80px';         // room for Streamlit's bar at the top
+    answer.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+}, 400);
+</script>"""
+
+
 def handle_submit(form, conn):
     """Runs once when the content form is submitted."""
+    with st.container(key="answer"):              # the place SHOW_THE_ANSWER scrolls to
+        st.html(SHOW_THE_ANSWER, unsafe_allow_javascript=True)
     doc_text = ""
     try:
         doc_text = extract_text_from_file(form.uploaded_file)

@@ -76,7 +76,7 @@ TEXTS = {
         "outline_first": "Show me the plan first",
         "outline_first_help": "The AI first proposes the list of slides; you edit it, then the slides are written.",
         "generate": "🚀 Generate presentation",
-        "design_hint": "The design on the right can be changed at any time, even after generation.",
+        "design_hint": "The design (style, colours, logo) can be changed at any time, even after generation.",
 
         # design
         "design": "Design",
@@ -160,7 +160,8 @@ TEXTS = {
         "json_header": "🔍 Generated content (JSON)",
         "example": "Example",
         "example_caption": "This is a built-in sample presentation drawn in the selected style and theme. "
-                           "Fill in the form on the left to generate your own.",
+                           "Fill in the form in the sidebar to generate your own (on a phone, open it "
+                           "with the » button at the top left).",
 
         # editing
         "edit_header": "✏️ Edit slides",
@@ -326,7 +327,7 @@ TEXTS = {
         "outline_first": "Сначала показать план",
         "outline_first_help": "ИИ сначала предложит список слайдов; вы его поправите, и только потом пишутся слайды.",
         "generate": "🚀 Создать презентацию",
-        "design_hint": "Оформление справа можно менять когда угодно, даже после генерации.",
+        "design_hint": "Оформление (стиль, цвета, логотип) можно менять когда угодно, даже после генерации.",
 
         "design": "Оформление",
         "colour_theme": "Цветовая палитра",
@@ -407,7 +408,8 @@ TEXTS = {
         "json_header": "🔍 Сгенерированное содержание (JSON)",
         "example": "Пример",
         "example_caption": "Это встроенная демонстрационная презентация в выбранном стиле и палитре. "
-                           "Заполните форму слева, чтобы создать свою.",
+                           "Заполните форму на боковой панели, чтобы создать свою (на телефоне она "
+                           "открывается кнопкой » вверху слева).",
 
         "edit_header": "✏️ Правка слайдов",
         "edit_caption": "Меняйте заголовки и текст или удаляйте слайды. Файл перерисуется без нового "

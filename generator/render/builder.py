@@ -7,13 +7,13 @@ Nothing here talks to the network or to an AI model, so the same content can be
 re-drawn in another style or colour theme instantly.
 """
 import base64
-from io import BytesIO
 
 from PIL import Image
 
 from generator.design.colors import make_palette
 from generator.design.styles import DEFAULT_STYLE, STYLES
 from generator.design.themes import DEFAULT_THEME, THEMES
+from generator.images.pictures import open_image
 from generator.render.html_backend import slide_to_html
 from generator.render.layouts import build_specs
 from generator.render.logo import FOOTER_RESERVE, LOGO_KEY, logo_aspect, place_logo
@@ -66,6 +66,5 @@ def build_preview(deck, style_key, theme_name, image_urls, logo=None):
 
 def logo_data_url(data):
     """The logo as a data: URL in its own format, so a transparent PNG stays transparent."""
-    image = Image.open(BytesIO(data))
-    mime = Image.MIME.get(image.format, "image/png")
+    mime = Image.MIME.get(open_image(data).format, "image/png")
     return f"data:{mime};base64," + base64.b64encode(data).decode()

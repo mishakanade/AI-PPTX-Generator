@@ -310,6 +310,19 @@ def _repair_chart_numbers(chart):
         series["values"] = numbers
 
 
+def _load_json(raw_text):
+    """The JSON object in a model's answer. Raises ContentError if there is none.
+
+    The outermost {...} is taken: models sometimes wrap JSON in explanations or code fences.
+    RecursionError is a JSON nested thousands of levels deep, which no real answer is.
+    """
+    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
+    try:
+        return json.loads(match.group(0) if match else raw_text)
+    except (ValueError, TypeError, RecursionError) as e:
+        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+
+
 def _known_type(value):
     """True for the name of a slide type. A model may put anything there, even a list."""
     return isinstance(value, str) and value in SLIDE_TYPE_GUIDE
@@ -320,12 +333,7 @@ def parse_deck(raw_text):
 
     Raises ContentError when the answer is not a presentation at all.
     """
-    # Take the outermost {...}: models sometimes wrap JSON in explanations or code fences.
-    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
-    try:
-        data = json.loads(match.group(0) if match else raw_text)
-    except (json.JSONDecodeError, TypeError) as e:
-        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    data = _load_json(raw_text)
 
     # Small repairs for answers produced without the strict schema.
     if isinstance(data, dict):
@@ -358,11 +366,7 @@ def parse_slide(raw_text):
     The slide goes through exactly the same checks as a slide of a whole presentation.
     Raises ContentError when the answer is not a slide at all.
     """
-    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
-    try:
-        data = json.loads(match.group(0) if match else raw_text)
-    except (json.JSONDecodeError, TypeError) as e:
-        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    data = _load_json(raw_text)
     if not isinstance(data, dict):
         raise ContentError("The model returned a slide in an unexpected format. Please try again.")
     return parse_deck(json.dumps({"title": "", "subtitle": "", "slides": [data]})).slides[0]
@@ -373,11 +377,7 @@ def parse_outline(raw_text):
 
     Raises ContentError when the answer is not a plan at all.
     """
-    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
-    try:
-        data = json.loads(match.group(0) if match else raw_text)
-    except (json.JSONDecodeError, TypeError) as e:
-        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    data = _load_json(raw_text)
     if not isinstance(data, dict) or not isinstance(data.get("slides"), list):
         raise ContentError("The model returned a plan in an unexpected format. Please try again.")
     slides = []
@@ -394,11 +394,7 @@ def parse_outline(raw_text):
 
 def parse_digest(raw_text):
     """The points of a digest answer. Raises ContentError when there are none."""
-    match = re.search(r"\{.*\}", raw_text or "", re.DOTALL)
-    try:
-        data = json.loads(match.group(0) if match else raw_text)
-    except (json.JSONDecodeError, TypeError) as e:
-        raise ContentError("The model returned an answer that is not valid JSON. Please try again.") from e
+    data = _load_json(raw_text)
     points = _clean_list(data.get("points") if isinstance(data, dict) else None, 60)
     if not points:
         raise ContentError("The model returned an empty digest. Please try again.")

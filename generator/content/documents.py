@@ -1,14 +1,38 @@
-"""Reading text out of the document the user attaches."""
+"""Reading text out of the document the user attaches.
+
+DOCX (and XLSX, see data.py) files are zip archives: compressed folders of XML files.
+A malicious archive of a few kilobytes can unpack to many gigabytes (a "zip bomb"), so
+check_archive looks at the sizes written in the archive before anything is unpacked.
+A PDF is read page by page only until there is more text than the app can use.
+"""
+import io
+import zipfile
+
 import docx
 import pypdf
 from docx.table import Table
+
+MAX_UNPACKED = 300_000_000     # bytes an archive may unpack to; real documents need a few MB
+MAX_TEXT = 400_000             # characters; more than the long-document reading uses (llm.py)
+
+
+def check_archive(data):
+    """Raise ValueError if these bytes are not a zip archive or would unpack to too much."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            unpacked = sum(entry.file_size for entry in archive.infolist())
+    except zipfile.BadZipFile as e:
+        raise ValueError("not a zip archive") from e
+    if unpacked > MAX_UNPACKED:
+        raise ValueError(f"the file unpacks to {unpacked // 1_000_000} MB")
 
 
 class DocumentReadError(Exception):
     """The attached file could not be turned into text.
 
-    reason is a short code the interface translates: "unsupported", "damaged", "empty" or
-    "scan" (a PDF without a text layer). str(error) is an English explanation.
+    reason is a short code the interface translates: "unsupported", "damaged", "empty",
+    "scan" (a PDF without a text layer) or "too_big" (it would unpack to far too much).
+    str(error) is an English explanation.
     """
 
     MESSAGES = {
@@ -16,6 +40,7 @@ class DocumentReadError(Exception):
         "damaged": "Could not read {name}: the file looks damaged.",
         "empty": "No text found in {name}.",
         "scan": "No text found in {name}. It may be a scan: pages stored as images, not text.",
+        "too_big": "{name} is too large to read: it unpacks to hundreds of megabytes.",
     }
 
     def __init__(self, reason, file_name):
@@ -26,12 +51,23 @@ class DocumentReadError(Exception):
 
 def _read_pdf(file):
     reader = pypdf.PdfReader(file)
-    pages = [page.extract_text() for page in reader.pages]
+    pages, length = [], 0
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        pages.append(text)
+        length += len(text)
+        if length > MAX_TEXT:            # enough: the rest would not be used anyway
+            break
     return "\n".join(text for text in pages if text)
 
 
 def _read_docx(file):
-    document = docx.Document(file)
+    data = file.read()
+    try:
+        check_archive(data)
+    except ValueError as e:
+        raise DocumentReadError("too_big" if "unpacks" in str(e) else "damaged", file.name) from e
+    document = docx.Document(io.BytesIO(data))
     parts = []
     # iter_inner_content() walks paragraphs and tables in the order they appear in the document.
     for block in document.iter_inner_content():

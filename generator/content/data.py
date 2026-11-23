@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+from generator.content.documents import check_archive
 from generator.content.schema import Chart, ChartSeries, Slide
 
 MAX_CATEGORIES = 8        # what a chart slide can show (see schema._normalize_chart)
@@ -72,6 +73,7 @@ def read_tables(file_name, content):
     lower = file_name.lower()
     try:
         if lower.endswith((".xlsx", ".xlsm")):
+            check_archive(content)               # an .xlsx is a zip archive: no zip bombs
             sheets = pd.read_excel(io.BytesIO(content), sheet_name=None)
             raw = [(f"{file_name} / {sheet}" if len(sheets) > 1 else file_name, frame)
                    for sheet, frame in sheets.items()]

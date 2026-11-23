@@ -7,10 +7,9 @@ slide. Decorative shapes (lines, bands, circles) and full-slide background photo
 under it. When there is a logo, content areas end a little higher (FOOTER_RESERVE) so that
 the bottom corners are usually free. If every corner is taken, the slide has no logo.
 """
-from io import BytesIO
 
-from PIL import Image
 
+from generator.images.pictures import open_image
 from generator.render.primitives import SLIDE_H, SLIDE_W, ChartShape, Picture, Text
 from generator.render.textfit import count_lines, text_height, text_width
 
@@ -25,11 +24,7 @@ RAISED = 0.45             # the extra corner positions sit this much above the b
 
 def logo_aspect(data):
     """Width divided by height of the logo image. Raises ValueError if it is not an image."""
-    try:
-        image = Image.open(BytesIO(data))
-        image.load()
-    except Exception as e:
-        raise ValueError("not an image") from e
+    image = open_image(data)                 # ValueError if it is not a picture or far too large
     return image.width / image.height
 
 

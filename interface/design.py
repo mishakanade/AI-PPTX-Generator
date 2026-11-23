@@ -8,6 +8,7 @@ import ui_text
 from generator.design.colors import from_hex, readable_theme, to_hex
 from generator.design.styles import STYLES
 from generator.design.themes import THEMES
+from generator.images.pictures import fit_for_slides
 from generator.render.builder import theme_colors
 from generator.render.logo import logo_aspect
 from interface.common import (
@@ -112,6 +113,9 @@ def _logo_choice():
     return logo
 
 
+LOGO_SIDE = 1200   # pixels; plenty for a logo in a corner, even on a large screen
+
+
 def _select_style(style_key):
     st.session_state["style"] = style_key
 
@@ -122,11 +126,12 @@ def _take_logo():
     if not uploaded:
         return
     try:
-        logo_aspect(uploaded.getvalue())
+        logo = fit_for_slides(uploaded.getvalue(), max_side=LOGO_SIDE)   # a logo needs few pixels
+        logo_aspect(logo)
     except ValueError:
         st.session_state["logo_message"] = tr("logo_not_image")
         return
-    st.session_state["logo"] = uploaded.getvalue()
+    st.session_state["logo"] = logo
 
 
 def _remove_logo():

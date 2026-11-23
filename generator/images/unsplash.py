@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from io import BytesIO
 
 import httpx
-from PIL import Image
 
 from generator import config
+from generator.images.pictures import fit_for_slides, open_image
 
 API_URL = "https://api.unsplash.com"
 CANDIDATES_PER_KEYWORD = 5
@@ -42,6 +42,7 @@ class Photo:
 def own_photo(data):
     """A picture the user uploaded. Raises ValueError if the bytes are not an image."""
     try:
+        data = fit_for_slides(data)              # a sensible size, the right way up
         return Photo(data=data, preview_url=make_preview(data))
     except Exception as e:
         raise ValueError("not an image") from e
@@ -71,9 +72,7 @@ def _search(client, keyword, key, per_page=CANDIDATES_PER_KEYWORD):
 
 def make_preview(data):
     """Check that the bytes are a real image and return a small JPEG copy as a data: URL."""
-    image = Image.open(BytesIO(data))
-    image.load()                      # raises an error if the file is damaged
-    image = image.convert("RGB")
+    image = open_image(data).convert("RGB")   # raises ValueError if damaged or absurdly large
     if image.width > PREVIEW_WIDTH:
         image = image.resize((PREVIEW_WIDTH, round(image.height * PREVIEW_WIDTH / image.width)))
     buffer = BytesIO()

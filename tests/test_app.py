@@ -296,6 +296,16 @@ def test_a_saved_project_opens_with_its_design(fakes):
     assert fakes["gemini"] == 1                         # opening did not ask the AI again
 
 
+def test_a_bare_deck_saved_from_a_chat_opens_and_can_be_checked(fakes):
+    """Such a file has no settings; the quality section still needs them."""
+    from generator.design.sample_deck import SAMPLE_DECK
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    raw = SAMPLE_DECK.model_dump_json().encode()
+    app.file_uploader(key="project_file").set_value(("answer.json", raw, "application/json")).run()
+    assert not app.exception and not app.error
+    assert app.session_state["settings"]["text_amount"] == "Balanced"
+
+
 def test_a_file_that_is_not_a_project_shows_an_error(fakes):
     app = AppTest.from_file(APP, default_timeout=60).run()
     app.file_uploader(key="project_file").set_value(("x.json", b"hello", "application/json")).run()

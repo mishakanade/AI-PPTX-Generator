@@ -549,6 +549,7 @@ def build_specs(deck, style, palette, image_keys, credits=None, footer_reserve=0
               footer_reserve=footer_reserve)
     cover = style.cover(ctx, "title", deck.title, deck.subtitle)
     cover.notes = deck.notes or ""
+    cover.title = deck.title
     specs = [cover]
     seen = {}   # how many slides of each type were drawn so far: chooses the layout variant
     for i, slide in enumerate(deck.slides):
@@ -564,5 +565,6 @@ def build_specs(deck, style, palette, image_keys, credits=None, footer_reserve=0
         if _image_key(ctx, slide) and slide.type in ("bullets", "image") and credits.get(slide.image_keyword):
             notes.append(credits[slide.image_keyword])
         spec.notes = "\n\n".join(notes)
+        spec.title = slide.title
         specs.append(spec)
     return specs

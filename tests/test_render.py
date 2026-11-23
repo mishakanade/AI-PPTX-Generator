@@ -105,3 +105,39 @@ def test_pdf_export_without_libreoffice_raises_a_clear_error(monkeypatch):
     monkeypatch.setattr(export, "find_soffice", lambda: None)
     with pytest.raises(export.ExportError):
         export.to_pdf(b"x")
+
+
+# ----- accessibility: real slide titles, decorative shapes -----------------------------------
+
+@pytest.mark.parametrize("style", STYLES)
+def test_every_slide_has_a_real_title_placeholder(style):
+    data = build_pptx(SAMPLE_DECK, style, "Corporate Blue", {SAMPLE_IMAGE: sample_photo()})
+    slides = list(Presentation(BytesIO(data)).slides)
+    titles = [slide.shapes.title for slide in slides]
+    assert all(title is not None for title in titles)
+    assert titles[0].text_frame.paragraphs[0].text == SAMPLE_DECK.title
+    for slide, title in zip(SAMPLE_DECK.slides, titles[1:]):
+        assert title.text_frame.paragraphs[0].text == slide.title
+    # exactly one title per slide, and its line spacing is written out (not taken from the template)
+    for slide in slides:
+        assert sum(1 for shape in slide.placeholders) == 1
+        assert slide.shapes.title.text_frame.paragraphs[0].line_spacing is not None
+
+
+def test_a_slide_that_shows_no_title_gets_one_just_above_the_slide():
+    quote = next(i for i, s in enumerate(SAMPLE_DECK.slides) if s.type == "quote")
+    slide = list(Presentation(BytesIO(build_pptx(SAMPLE_DECK, "minimal", "Corporate Blue", {}))).slides)[quote + 1]
+    title = slide.shapes.title
+    assert title.text_frame.text == SAMPLE_DECK.slides[quote].title
+    assert title.top + title.height <= 0                       # above the visible area
+
+
+def test_boxes_are_marked_decorative_and_texts_are_not():
+    slide = list(Presentation(BytesIO(build_pptx(SAMPLE_DECK, "corporate", "Corporate Blue", {}))).slides)[1]
+    decorative = "{C183D7F6-B498-43B3-948B-1728B52AA6E4}"
+
+    def is_decorative(shape):
+        return decorative in shape._element.xml
+    boxes = [s for s in slide.shapes if s.shape_type == 1]     # auto shapes: rectangles, ovals
+    assert boxes and all(is_decorative(s) for s in boxes)
+    assert not any(is_decorative(s) for s in slide.shapes if s.has_text_frame and s.text_frame.text.strip())

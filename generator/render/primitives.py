@@ -141,3 +141,5 @@ class SlideSpec:
     background: Fill
     items: list[Box | Text | Picture | ChartShape] = field(default_factory=list)
     notes: str = ""                # speaker notes
+    title: str = ""                # the slide's title: the text block that shows it becomes
+                                   # PowerPoint's real title (outline view, navigation, screen readers)

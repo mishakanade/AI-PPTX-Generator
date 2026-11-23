@@ -51,6 +51,9 @@ The project is in alpha and is built solo, so expect changes.
 - **Your logo on every slide.** It is placed automatically in a free corner of each slide,
   never over text, photos or charts; transparent PNGs keep their transparency.
 - **Slide transitions.** Fade, push or wipe between slides, played by PowerPoint.
+- **Accessible files.** Every slide has a real PowerPoint title (shown in the outline view and
+  the slide list, announced by screen readers), photos carry alternative text, and decorative
+  shapes are marked as such, so PowerPoint's accessibility check has nothing to report.
 - **Speaker notes.** Optionally, the model writes what to say on each slide; the notes go into
   PowerPoint's presenter view. Photo credits are added to the notes as well.
 - **Instant redesign.** After generation, pick another style or theme: the file is redrawn
@@ -59,7 +62,7 @@ The project is in alpha and is built solo, so expect changes.
   the file is redrawn without asking the model again. Or let the AI rewrite a single slide,
   optionally with a wish such as "shorter" or "turn it into a chart".
 - **Your photos, your choice.** Swap any slide's photo for another one from Unsplash, upload
-  your own picture, or remove it. Photos carry alternative text for screen readers.
+  your own picture, or remove it.
 - **Save and reopen projects.** One `.project.json` file keeps the text, photos, style and
   colours, so you can come back later, restyle and download again without asking the AI.
 - **PDF too**, where LibreOffice is installed: a "Make a PDF" button appears next to the download.

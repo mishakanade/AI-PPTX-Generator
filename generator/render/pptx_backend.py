@@ -16,7 +16,7 @@ from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
-from generator.render.primitives import SLIDE_H, SLIDE_W, Box, ChartShape, Gradient, Picture, Text
+from generator.render.primitives import SLIDE_H, SLIDE_W, Box, ChartShape, Gradient, Para, Picture, Text
 from generator.render.textfit import BULLET_INDENT_EM
 
 ALIGN = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}
@@ -24,6 +24,9 @@ ANCHOR = {"top": MSO_ANCHOR.TOP, "middle": MSO_ANCHOR.MIDDLE, "bottom": MSO_ANCH
 # python-pptx measures gradient angles counter-clockwise, starting from "left to right"
 GRADIENT_ANGLE = {"horizontal": 0, "vertical": 270, "diagonal": 315}
 EMU_PER_POINT = 12700
+# Office's mark for decorative shapes (an extension of the file format, understood since 2019)
+DECORATIVE_EXT = "{C183D7F6-B498-43B3-948B-1728B52AA6E4}"
+DECORATIVE_NS = "http://schemas.microsoft.com/office/drawing/2017/decorative"
 
 
 def _rgb(color):
@@ -111,10 +114,40 @@ def _draw_box(slide, box):
         shape.line.width = Pt(box.line_width)
     if box.shadow:
         _set_shadow(shape)
+    _mark_decorative(shape._element.nvSpPr.cNvPr)    # backgrounds, cards, lines: nothing to read out
 
 
-def _draw_text(slide, block):
+def _make_title(shape):
+    """Turn a text box into the slide's title placeholder.
+
+    It looks exactly the same, but PowerPoint now knows it is the title: the outline view and
+    the slide list show it instead of "Slide 3", screen readers announce it, and PowerPoint's
+    accessibility check stops reporting "missing slide title".
+    """
+    nv = shape._element.nvSpPr
+    nv.cNvSpPr.attrib.pop("txBox", None)
+    etree.SubElement(nv.cNvSpPr, qn("a:spLocks"), noGrp="1")
+    etree.SubElement(nv.nvPr, qn("p:ph"), type="title")
+
+
+def _mark_decorative(cnv):
+    """Tell screen readers and PowerPoint's accessibility check to skip a purely decorative shape.
+
+    cnv is the shape's <p:cNvPr> element (its name, id and description)."""
+    ext_list = etree.SubElement(cnv, qn("a:extLst"))
+    ext = etree.SubElement(ext_list, qn("a:ext"), uri=DECORATIVE_EXT)
+    etree.SubElement(ext, f"{{{DECORATIVE_NS}}}decorative", nsmap={"adec": DECORATIVE_NS}, val="1")
+
+
+def is_title_block(block, title):
+    """The text block that shows the slide title: its first paragraph is the title."""
+    return bool(title) and bool(block.paragraphs) and block.paragraphs[0].text.strip() == title.strip()
+
+
+def _draw_text(slide, block, is_title=False):
     shape = slide.shapes.add_textbox(Inches(block.x), Inches(block.y), Inches(block.w), Inches(block.h))
+    if is_title:
+        _make_title(shape)
     frame = shape.text_frame
     frame.word_wrap = True
     frame.auto_size = MSO_AUTO_SIZE.NONE
@@ -126,7 +159,8 @@ def _draw_text(slide, block):
         paragraph = frame.paragraphs[0] if i == 0 else frame.add_paragraph()
         size = para.size or block.size
         paragraph.alignment = ALIGN[block.align]
-        if block.line_spacing != 1.0:
+        if block.line_spacing != 1.0 or is_title:
+            # always written for a title: otherwise it would take the template's title spacing (90%)
             paragraph.line_spacing = block.line_spacing
         gap = block.space_after if para.space_after is None else para.space_after
         if gap and i < len(block.paragraphs) - 1:
@@ -167,6 +201,8 @@ def _draw_picture(slide, item, images):
     if item.alt:
         # PowerPoint's "alt text": read aloud by screen readers instead of the image
         picture._element.nvPicPr.cNvPr.set("descr", item.alt)
+    else:
+        _mark_decorative(picture._element.nvPicPr.cNvPr)   # the logo, or a picture nobody described
 
 
 CHART_TYPES = {
@@ -321,15 +357,23 @@ def draw_slide(presentation, spec, images, transition=None):
     """Add one slide to the presentation and draw every item of its description."""
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])   # layout 6 is blank
     _apply_fill(slide.background.fill, spec.background)
+    title_found = False
     for item in spec.items:
         if isinstance(item, Box):
             _draw_box(slide, item)
         elif isinstance(item, Text):
-            _draw_text(slide, item)
+            is_title = not title_found and is_title_block(item, spec.title)
+            title_found = title_found or is_title
+            _draw_text(slide, item, is_title)
         elif isinstance(item, Picture):
             _draw_picture(slide, item, images)
         elif isinstance(item, ChartShape):
             _draw_chart(slide, item)
+    if spec.title and not title_found:
+        # the layout shows no title (a quote slide, for example): the title is put just above the
+        # slide, where no one sees it but the outline view and screen readers still find it
+        hidden = Text(0, -1.0, SLIDE_W, 0.8, [Para(spec.title)], size=24)
+        _draw_text(slide, hidden, is_title=True)
     if spec.notes:
         slide.notes_slide.notes_text_frame.text = spec.notes
     if transition in TRANSITIONS:

@@ -15,7 +15,7 @@ from generator.render.layout_tools import Area, CardLook, heading, measured, rul
 from generator.render.primitives import SLIDE_H as H
 from generator.render.primitives import SLIDE_W as W
 from generator.render.primitives import Box, Gradient, Para, Picture, SlideSpec, Text
-from generator.render.textfit import count_lines, simple_text
+from generator.render.textfit import count_lines, simple_text, text_width
 
 
 class Style:
@@ -396,7 +396,10 @@ class Bold(Style):
             Box(W - 3.3, 3.5, 5.2, 5.2, fill=ink, alpha=0.06, ellipse=True),
         ]
         if kind == "section":
-            items.append(simple_text(W - M - 4.0, 0.5, 4.0, 2.3, f"{ctx.number:02d}", font=self.heading_font,
+            # the box is as wide as the number itself, so that a long title may pass under its left side
+            number = f"{ctx.number:02d}"
+            number_w = text_width(number, self.heading_font, 130, bold=True) * 1.1
+            items.append(simple_text(W - M - number_w, 0.5, number_w, 2.3, number, font=self.heading_font,
                                      size=130, bold=True, color=mix(p.accent, ink, 0.3), align="right"))
         # the text is pinned to the bottom of its box and grows upwards; the bar sits under it
         text = self.cover_text(ctx, kind, title, subtitle, bullets, M, 9.4, ink,

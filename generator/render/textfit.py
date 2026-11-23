@@ -7,6 +7,7 @@ and breaks text into lines the same way PowerPoint does. Layouts use it to choos
 sizes and to stack blocks under each other without overlaps.
 """
 import json
+import math
 from functools import lru_cache
 from pathlib import Path
 
@@ -110,14 +111,20 @@ def best_scale(block, limit=None, min_scale=0.55, max_scale=1.0, fill=0.85):
 def apply_scale(block, scale):
     """Multiply every font size and paragraph gap of a Text block by `scale`."""
     if abs(scale - 1.0) > 1e-9:
-        block.size = round(block.size * scale, 1)
-        block.space_after = round(block.space_after * scale, 1)
+        block.size = _round_down(block.size * scale)
+        block.space_after = _round_down(block.space_after * scale)
         for para in block.paragraphs:
             if para.size:
-                para.size = round(para.size * scale, 1)
+                para.size = _round_down(para.size * scale)
             if para.space_after:
-                para.space_after = round(para.space_after * scale, 1)
+                para.space_after = _round_down(para.space_after * scale)
     return block
+
+
+def _round_down(points):
+    """To a tenth of a point, never up: best_scale checked the exact size, and a size rounded
+    up by even 0.05 pt can push one more word onto the next line, so that the text no longer fits."""
+    return math.floor(points * 10 + 1e-6) / 10
 
 
 def fit(block, min_scale=0.55, max_scale=1.0, fill=0.85):

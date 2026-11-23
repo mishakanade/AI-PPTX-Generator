@@ -17,3 +17,19 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
+
+  # The layout checked against a real renderer (tests/test_rendering.py): LibreOffice draws
+  # the slides with the free twins of the Office fonts, and the PDF is read back.
+  rendering:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-impress fonts-crosextra-carlito fonts-liberation
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q tests/test_rendering.py tests/test_render.py
+        env:
+          REQUIRE_RENDERING: "1"

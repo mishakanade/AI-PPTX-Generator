@@ -1,2 +1,3 @@
 -r requirements.txt
 pytest==9.2.0
+pymupdf==2.1        # reads the PDF in tests/test_rendering.py

@@ -173,7 +173,7 @@ generator/
     pptx_backend.py          draws slides into a .pptx file
     html_backend.py          draws slides as HTML for the preview
     logo.py                  puts the logo into a free corner of each slide
-tests/                       automated tests (see below)
+tests/                       automated tests (see below); render_check.py reads a drawn PDF back
 tools/
   render_samples.py          saves the example deck in every style to samples/
   build_font_metrics.py      regenerates font_metrics.json
@@ -192,6 +192,13 @@ python -m pytest -q
 The tests check, among other things, that on every slide type, in every style, text and
 photos stay on the slide, every text fits its box and no texts overlap. They also run on
 GitHub for every push.
+
+Those checks trust the engine's own text measurements. `tests/test_rendering.py` checks
+them against a real renderer: LibreOffice draws every style, and the PDF is read back to
+see where each line actually landed (outside its box, overlapping, or missing). It runs
+where LibreOffice, `pymupdf` and the free twins of the Office fonts are installed
+(on Ubuntu: `libreoffice-impress fonts-crosextra-carlito fonts-liberation`), and on GitHub
+in a job of its own; elsewhere it is skipped.
 
 To look at the designs without API keys, save the example deck in every style:
 

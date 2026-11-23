@@ -22,8 +22,11 @@ SOURCES = {
     # Georgia is noticeably wider than Times; the multipliers are deliberately on the safe side.
     "Georgia": ("liberation/LiberationSerif-Regular.ttf", "liberation/LiberationSerif-Bold.ttf", 1.16, 1.2),
 }
-# Line height at "single" spacing, as a multiple of the font size (from the real fonts' metrics).
-LINE_HEIGHT = {"Calibri": 1.22, "Arial": 1.15, "Georgia": 1.14}
+# Line height at "single" spacing, as a multiple of the font size. From the real fonts' metrics,
+# except Arial and Georgia: their metrics say 1.15 and 1.14, but LibreOffice draws their lines
+# (and those of their stand-ins) 1.2 apart, as tests/test_rendering.py measured, so the larger
+# value is used to be safe in both programs.
+LINE_HEIGHT = {"Calibri": 1.22, "Arial": 1.2, "Georgia": 1.2}
 
 CHARS = (
     "".join(chr(c) for c in range(32, 127))            # ASCII

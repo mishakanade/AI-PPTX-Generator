@@ -8,6 +8,12 @@ slide in the style and colours you choose.
 It is a BYOK (Bring Your Own Key) application: you use your own API keys.
 The project is in alpha and is built solo, so expect changes.
 
+![Example slides in five styles and six colour themes](docs/images/slides.jpg)
+
+*Slides of the built-in example deck in several styles and colour themes, as the app draws them.*
+
+![The app: AI provider and keys on the left, design choices on the right](docs/images/interface.png)
+
 ## What it does
 
 - **Your choice of AI.** Gemini, OpenAI (ChatGPT models) or Anthropic (Claude) through their
@@ -87,6 +93,19 @@ The project is in alpha and is built solo, so expect changes.
 
 Instead of step 4 you can paste the keys into **API keys** in the app's sidebar. Keys typed
 there are kept only for that browser session and are never saved.
+
+### With Docker
+
+If you have Docker, steps 3 to 5 are two commands, and the PDF export works out of the box
+(the image includes LibreOffice and the fonts it needs):
+
+```bash
+docker build -t ai-pptx-generator .
+docker run -p 8501:8501 --env-file .env ai-pptx-generator
+```
+
+Then open http://localhost:8501. Without a `.env` file, leave out `--env-file .env` and type
+the keys into the sidebar.
 
 ## Publishing the app
 
@@ -177,8 +196,13 @@ tests/                       automated tests (see below); render_check.py reads 
 tools/
   render_samples.py          saves the example deck in every style to samples/
   build_font_metrics.py      regenerates font_metrics.json
+  readme_images.py           makes docs/images/slides.jpg, the example slides above
 .streamlit/config.toml       look of the interface
+Dockerfile                   the app in a container, LibreOffice included
+pyproject.toml               settings of the development tools (pytest, ruff)
 ```
+
+How to help: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 

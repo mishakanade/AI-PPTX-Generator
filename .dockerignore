@@ -1,0 +1,12 @@
+# Kept out of the image: secrets, local clutter, generated files
+.env
+.streamlit/secrets.toml
+.git
+.github
+**/__pycache__
+*.pyc
+.venv
+venv
+samples
+.pytest_cache
+.ruff_cache

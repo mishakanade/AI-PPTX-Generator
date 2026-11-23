@@ -161,7 +161,9 @@ def _quality_section(deck, conn):
                 except Exception as e:
                     show_error(e, conn)
                     return
-            if fixed is deck:
+            # compared by content: review() works on a copy (with the chart data bound), so the
+            # kept draft is equal to the current deck but never the very same object
+            if fixed == deck:
                 st.session_state["fix_message"] = tr("fix_not_better")
             else:
                 _replace_deck(fixed)

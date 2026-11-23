@@ -18,3 +18,7 @@ Thumbs.db
 samples/
 evaluation/
 .pytest_cache/
+
+# test coverage data (python -m coverage run -m pytest)
+.coverage
+htmlcov/

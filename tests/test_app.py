@@ -578,3 +578,66 @@ def test_a_failed_generation_shows_advice_instead_of_the_raw_error(fakes, monkey
     assert not app.exception
     assert any("did not accept the API key" in e.value for e in app.error)
     assert any(x.label == "Technical details" for x in app.expander)
+
+
+# ----- what the page says when something is missing or fails --------------------------------
+
+def test_a_data_file_without_a_usable_table_is_explained_and_the_deck_still_made(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.text_input(key="topic").set_value("Финансы")
+    app.file_uploader(key="data_file").set_value(("notes.csv", b"only;words\nhello;world\n", "text/csv"))
+    app.button(key="generate").click().run()
+    assert not app.exception
+    assert any("The data was not used" in w.value for w in app.warning)
+    assert fakes["gemini"] == 1 and "deck" in app.session_state
+
+
+def test_a_failed_plan_shows_advice(fakes, monkeypatch):
+    import httpx
+    import openai
+
+    def refuse(*args, **kwargs):
+        request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+        raise openai.AuthenticationError("bad key", response=httpx.Response(401, request=request), body=None)
+    monkeypatch.setattr(llm, "generate_outline", refuse)
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.selectbox(key="provider").set_value("openai").run()
+    app.text_input(key="openai_key").set_value("sk-wrong")
+    app.text_input(key="topic").set_value("Космос")
+    app.checkbox(key="outline_first").check()
+    app.button(key="generate").click().run()
+    assert not app.exception
+    assert any("key" in e.value.lower() and "OpenAI" in e.value for e in app.error)
+    assert "outline" not in app.session_state
+
+
+def test_copy_and_paste_mode_asks_for_the_answer_before_building(fakes):
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    app.selectbox(key="provider").set_value("chat").run()
+    app.text_input(key="topic").set_value("x")
+    app.button(key="generate").click().run()
+    app.button(key="chat_build_deck").click().run()
+    assert not app.exception
+    assert any("Paste the AI's answer first" in w.value for w in app.warning)
+
+
+def test_a_failed_pdf_is_explained(fakes, monkeypatch):
+    from generator import export
+
+    def fail(pptx):
+        raise export.ExportError("LibreOffice took too long to make the PDF.")
+    monkeypatch.setattr(export, "find_soffice", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(export, "to_pdf", fail)
+    app = generated_app(fakes)
+    app.button(key="make_pdf").click().run()
+    assert not app.exception
+    assert any("PDF could not be made" in e.value and "too long" in e.value for e in app.error)
+
+
+def test_a_revision_that_is_not_better_is_not_taken(fakes):
+    app = generated_app(fakes)
+    before = app.session_state["deck"]
+    app.button(key="fix_ai").click().run()             # the fake editor returns the same deck
+    assert not app.exception and not app.error
+    assert app.session_state["deck"] == before
+    assert any("was not better" in i.value for i in app.info)

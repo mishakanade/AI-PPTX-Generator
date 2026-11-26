@@ -114,16 +114,32 @@ the keys into the sidebar.
 
 ## Publishing the app
 
-On a hosting such as Streamlit Community Cloud there is no `.env` file. Either let every
-visitor paste their own key in the sidebar (true BYOK), or give the app your keys as
-secrets, in TOML format:
+The simplest place is Streamlit Community Cloud: free, and it works from a phone too.
+
+1. Open https://share.streamlit.io and sign in with GitHub.
+2. **Create app** → **Deploy a public app from GitHub**.
+3. Repository: this one; branch: the one you want to try; main file path: `app.py`.
+4. Optionally pick an address under **App URL**, then **Deploy**. The first start takes
+   several minutes: `packages.txt` makes it install LibreOffice too, for the PDF export.
+5. When the page opens, choose the AI in the sidebar and paste your keys there.
+
+Every push to that branch updates the app by itself.
+
+On such a hosting there is no `.env` file. Either let every visitor paste their own key in
+the sidebar (true BYOK), or give the app your keys under **Settings → Secrets**, in TOML format:
 
 ```toml
 GEMINI_API_KEY = "..."
 UNSPLASH_CLIENT_ID = "..."
 ```
 
-Keep in mind that keys set as secrets are used by everyone who opens the app.
+Keys set as secrets are used by **everyone** who opens the app, and a public app can be
+opened by anyone with its address. For your own use, either paste the keys in the sidebar
+each time (they are kept only for that browser session), or make the app private under
+**Settings → Sharing** before adding secrets.
+
+If the first start fails while installing LibreOffice, delete `packages.txt`: the app then
+runs without the PDF button.
 
 ## How it works
 
@@ -204,6 +220,7 @@ tools/
   readme_images.py           makes docs/images/slides.jpg, the example slides above
   evaluate.py                compares the app with a plain "make a presentation" request
 .streamlit/config.toml       look of the interface
+packages.txt                 system programs Streamlit Cloud installs (LibreOffice, fonts)
 Dockerfile                   the app in a container, LibreOffice included
 pyproject.toml               settings of the development tools (pytest, ruff)
 ```

@@ -14,6 +14,8 @@ from interface.common import browser_language, tr
 
 # the sidebar holds the form, so it starts open: on a phone it would otherwise be hidden
 st.set_page_config(page_title="AI PPTX Generator", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+# Streamlit leaves a lot of empty space above the page title; half of it is enough
+st.html("<style>[data-testid='stMainBlockContainer'] { padding-top: 2.5rem; }</style>")
 st.session_state.setdefault("lang", browser_language())
 st.session_state.setdefault("style", DEFAULT_STYLE)
 
@@ -24,19 +26,17 @@ st.caption(tr("page_caption"))
 conn = sidebar.connection()
 form = sidebar.content_form()
 
-# how the slides look
-look = design.design_section()
-st.divider()
-
-# writing the content: on submit, then the copy & paste panel and the plan when they are waiting
+# the answer to "Generate" first, where it is seen: progress, the copy & paste panel, the plan
 if form.submitted:
     generation.handle_submit(form, conn)
 generation.chat_panel(conn)
 generation.outline_panel(conn)
 
-# the file is drawn whenever the content or the design changed, then shown
-result.render(look)
-if "pptx_bytes" in st.session_state:
-    result.result_section(look, conn)
+if "deck" in st.session_state:
+    # a presentation exists: its downloads on top, slides, design, quality, editing in tabs
+    result.workspace(conn)
 else:
+    # nothing yet: choose the design and see it on the built-in example
+    look = design.design_section()
+    st.divider()
     result.example_section(look)

@@ -130,20 +130,22 @@ def forget_presentation():
 
 # ----- slide previews -----------------------------------------------------------------------
 
-def show_slide(slide_html):
-    """Show one slide preview with a thin frame around it."""
+def show_slide(slide_html, number=None):
+    """Show one slide preview with a thin frame around it, and its number under it if given."""
+    label = (f'<div style="font-size:0.75rem;opacity:0.6;margin-top:4px;">{number}</div>'
+             if number is not None else "")
     st.html(
         '<div style="border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(128,128,128,0.35);">'
-        f"{slide_html}</div>"
+        f"{slide_html}</div>{label}"
     )
 
 
-def show_slides(slide_htmls):
-    """Show slide previews as a grid."""
+def show_slides(slide_htmls, numbered=False):
+    """Show slide previews as a grid; numbered: with the slide number under each (1 = title slide)."""
     columns = st.columns(PREVIEW_COLUMNS)
     for i, slide_html in enumerate(slide_htmls):
         with columns[i % PREVIEW_COLUMNS]:
-            show_slide(slide_html)
+            show_slide(slide_html, i + 1 if numbered else None)
 
 
 @st.cache_data(show_spinner=False)

@@ -15,7 +15,7 @@ from generator.design.styles import STYLES
 from generator.images import unsplash
 from generator.project import save_project
 from generator.render.builder import build_pptx, build_preview
-from interface import generation
+from interface import design, generation
 from interface.common import (
     UNSPLASH_LINK,
     current_language,
@@ -28,47 +28,86 @@ from interface.common import (
 )
 
 
-def render(design):
+def render(look):
     """Draw the file and the preview whenever the content or the design changed.
 
     No AI or Unsplash calls happen here, so switching designs is instant.
     """
-    if "deck" not in st.session_state or st.session_state.get("rendered_design") == design.key:
+    if "deck" not in st.session_state or st.session_state.get("rendered_design") == look.key:
         return
     deck, photos = st.session_state["deck"], st.session_state["photos"]
     try:
         st.session_state["pptx_bytes"] = build_pptx(
-            deck, design.style, design.theme,
+            deck, look.style, look.theme,
             images={key: photo.data for key, photo in photos.items()},
             credits={key: photo.credit for key, photo in photos.items() if photo.credit},
-            transition=design.transition,
-            logo=design.logo,
+            transition=look.transition,
+            logo=look.logo,
         )
         st.session_state["preview"] = build_preview(
-            deck, design.style, design.theme,
+            deck, look.style, look.theme,
             {key: photo.preview_url for key, photo in photos.items()},
-            logo=design.logo,
+            logo=look.logo,
         )
-        st.session_state["rendered_design"] = design.key
+        st.session_state["rendered_design"] = look.key
     except Exception as e:
         st.session_state.pop("pptx_bytes", None)
         st.error(tr("build_error", error=e))
 
 
-def example_section(design):
-    """Before the first generation: the built-in example deck in the chosen design."""
+def example_section(look):
+    """Before the first generation: the built-in example deck in the chosen look."""
     st.subheader(tr("example"))
     st.caption(tr("example_caption"))
-    show_slides(sample_preview(design.style, design.theme, current_language()))
+    show_slides(sample_preview(look.style, look.theme, current_language()))
 
 
-def result_section(design, conn):
+def workspace(conn):
+    """Once there is a presentation: its name and downloads on top, everything else in tabs.
+
+    The design controls sit in a tab too, but they must run before the file is drawn (the file
+    depends on them) and the header must show the finished file. Streamlit places elements in
+    the container they are written into, not in the order the code runs, so the header's place
+    is reserved first and filled last.
+    """
+    top = st.container()
+    tabs = st.tabs([tr("tab_slides"), tr("tab_design"), tr("tab_quality"), tr("tab_edit"), tr("tab_photos"),
+                    tr("tab_notes")])
+    with tabs[1]:
+        look = design.design_section(heading=False)
+    render(look)
+    if "pptx_bytes" not in st.session_state:
+        return                              # the file could not be drawn; render() said why
     deck, photos = st.session_state["deck"], st.session_state["photos"]
-    title_column, button_column = st.columns([2, 1], vertical_alignment="bottom")
+    with top:
+        _header(deck, photos, look)
+    with tabs[0]:
+        for warning in st.session_state.get("photo_warnings", []):
+            st.warning(f"⚠️ {tr(warning)}")
+        show_slides(st.session_state["preview"], numbered=True)
+        st.caption(tr("preview_note"))
+    with tabs[1]:
+        st.markdown(f"##### {tr('design_preview')}")
+        show_slides(st.session_state["preview"][:3], numbered=True)
+    with tabs[2]:
+        _quality_section(deck, conn)
+    with tabs[3]:
+        _edit_section(deck)
+        st.divider()
+        _regenerate_section(deck, conn)
+    with tabs[4]:
+        _photos_section(deck, photos, conn)
+    with tabs[5]:
+        _notes_and_credits(deck, photos)
+
+
+def _header(deck, photos, look):
+    """The presentation's name and what it is, and the buttons to take it away."""
+    title_column, button_column = st.columns([3, 2], vertical_alignment="center")
     with title_column:
         st.subheader(plain(deck.title))
-        st.caption(tr("result_caption", count=len(deck.slides) + 1, style=STYLES[design.style].name,
-                      theme=design.theme_label))
+        st.caption(tr("result_caption", count=len(deck.slides) + 1, style=STYLES[look.style].name,
+                      theme=look.theme_label))
     with button_column:
         st.download_button(
             label=tr("download"),
@@ -79,27 +118,20 @@ def result_section(design, conn):
             width="stretch",
             key="download",
         )
-        st.download_button(
-            label=tr("save_project"),
-            data=save_project(deck, photos, design.style, design.theme, st.session_state.get("settings"),
-                              design.transition, design.logo),
-            file_name=st.session_state["file_name"].removesuffix(".pptx") + ".project.json",
-            mime="application/json",
-            width="stretch",
-            key="save_project",
-            help=tr("save_project_help"),
-        )
-        _pdf_buttons()
-    for warning in st.session_state.get("photo_warnings", []):
-        st.warning(f"⚠️ {tr(warning)}")
-
-    show_slides(st.session_state["preview"])
-    st.caption(tr("preview_note"))
-    _quality_section(deck, conn)
-    _edit_section(deck)
-    _photos_section(deck, photos, conn)
-    _regenerate_section(deck, conn)
-    _notes_and_credits(deck, photos)
+        save, pdf = st.columns(2)
+        with save:
+            st.download_button(
+                label=tr("save_project"),
+                data=save_project(deck, photos, look.style, look.theme, st.session_state.get("settings"),
+                                  look.transition, look.logo),
+                file_name=st.session_state["file_name"].removesuffix(".pptx") + ".project.json",
+                mime="application/json",
+                width="stretch",
+                key="save_project",
+                help=tr("save_project_help"),
+            )
+        with pdf:
+            _pdf_buttons()
 
 
 def _pdf_buttons():
@@ -143,7 +175,8 @@ def _quality_section(deck, conn):
     """What the app's own checks find in the slides, and a way to let the AI fix it."""
     settings = current_settings()
     issues = check_deck(deck, settings["text_amount"], settings["speaker_notes"])
-    with st.expander(tr("quality_header", score=score(issues))):
+    with st.container():
+        st.markdown(f"##### {tr('quality_header', score=score(issues))}")
         message = st.session_state.pop("fix_message", None)
         if message:
             st.info(message)
@@ -205,7 +238,8 @@ def _edit_section(deck):
     # The widget keys include a version number: after a new generation or after applying edits
     # the form starts again from the current content instead of keeping old typed values.
     version = st.session_state.setdefault("edit_version", 0)
-    with st.expander(tr("edit_header")):
+    with st.container():
+        st.markdown(f"##### {tr('edit_header')}")
         st.caption(tr("edit_caption"))
         with st.form(f"edit_form_{version}", border=False):
             title = st.text_input(tr("deck_title"), deck.title, key=f"e{version}_title")
@@ -244,7 +278,8 @@ def _edit_section(deck):
 def _regenerate_section(deck, conn):
     """Rewrite one chosen slide with the AI, optionally following the user's wish."""
     version = st.session_state.get("edit_version", 0)
-    with st.expander(tr("regen_header")):
+    with st.container():
+        st.markdown(f"##### {tr('regen_header')}")
         st.caption(tr("regen_caption"))
         index = st.selectbox(
             tr("regen_slide"), range(len(deck.slides)), key=f"regen_slide_{version}",
@@ -312,7 +347,7 @@ def _slide_by_chat(prompt, version, index):
 def _photos_section(deck, photos, conn):
     """Per slide that can show a photo: its current picture and the ways to change it."""
     version = st.session_state.get("edit_version", 0)
-    with st.expander(tr("photos_header")):
+    with st.container():
         st.caption(tr("photos_caption"))
         message = st.session_state.pop("photo_message", None)
         if message:
@@ -391,7 +426,8 @@ def _remove_photo(index):
 def _notes_and_credits(deck, photos):
     slides_with_notes = [(tr("title_slide"), deck.notes)] + [(slide.title, slide.notes) for slide in deck.slides]
     if any(notes for _, notes in slides_with_notes):
-        with st.expander(tr("notes_header")):
+        with st.container():
+            st.markdown(f"##### {tr('notes_header')}")
             for number, (title, notes) in enumerate(slides_with_notes, 1):
                 if notes:
                     st.markdown(f"**{number}. {plain(title)}**")
@@ -399,10 +435,11 @@ def _notes_and_credits(deck, photos):
             st.caption(tr("notes_note"))
     unsplash_photos = {keyword: photo for keyword, photo in photos.items() if photo.author}
     if unsplash_photos:
-        with st.expander(tr("credits_header")):
+        with st.container():
+            st.markdown(f"##### {tr('credits_header')}")
             for keyword, photo in unsplash_photos.items():
                 st.markdown(tr("credit_line", keyword=plain(keyword), author=plain(photo.author),
                                url=photo.author_url, unsplash=UNSPLASH_LINK))
             st.caption(tr("credits_note"))
-    with st.expander(tr("json_header")):
+    with st.expander(tr("json_header")):      # the raw content stays folded: rarely needed
         st.json(deck.model_dump(exclude_none=True))

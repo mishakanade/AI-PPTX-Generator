@@ -219,6 +219,7 @@ tools/
   build_font_metrics.py      regenerates font_metrics.json
   readme_images.py           makes docs/images/slides.jpg, the example slides above
   evaluate.py                compares the app with a plain "make a presentation" request
+  ui_demo.py                 the app with a pretend AI, to look at every screen without keys
 .streamlit/config.toml       look of the interface
 packages.txt                 system programs Streamlit Cloud installs (LibreOffice, fonts)
 Dockerfile                   the app in a container, LibreOffice included
@@ -260,6 +261,13 @@ where LibreOffice, `pymupdf` and the free twins of the Office fonts are installe
 in a job of its own; elsewhere it is skipped. The same test measures the contrast of every
 line of text against the real pixels behind it (the slide drawn once more without text), with
 the hardest photos: plain white and plain black.
+
+To click through the whole interface without API keys (a pretend AI answers with the
+example presentation, nothing is sent anywhere):
+
+```bash
+python -m streamlit run tools/ui_demo.py
+```
 
 To look at the designs without API keys, save the example deck in every style:
 

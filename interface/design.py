@@ -38,9 +38,11 @@ class Design:
         return (self.style, self.theme, self.transition, logo_id)
 
 
-def design_section():
+def design_section(heading=True):
+    """Theme, transition, logo and style. heading=False inside the result's "Design" tab."""
     lang = current_language()
-    st.subheader(tr("design"))
+    if heading:
+        st.subheader(tr("design"))
     theme_column, transition_column, _ = st.columns([1, 1, 1])
     with theme_column:
         theme, theme_label = _theme_choice()
@@ -52,10 +54,10 @@ def design_section():
         logo = _logo_choice()
 
     st.markdown(f"**{tr('style')}**")
-    st.html(PHONE_CARDS_CSS)
+    st.html(PHONE_CARDS_CSS + SELECTED_CARD_CSS.format(style=st.session_state["style"]))
     cards = st.container(key="style_cards")       # the key gives the CSS above a name to aim at
     for column, (style_key, style) in zip(cards.columns(len(STYLES)), STYLES.items()):
-        with column, st.container(border=True):
+        with column, st.container(border=True, key=f"style_card_{style_key}"):
             # each card shows the real title slide of the example deck in this style and theme
             show_slide(sample_preview(style_key, theme, lang)[0])
             st.markdown(f"**{style.name}**")
@@ -126,6 +128,12 @@ PHONE_CARDS_CSS = """<style>
   }
   .st-key-style_cards [data-testid="stCaptionContainer"] { display: none; }
 }
+</style>"""
+# The chosen style's card gets a frame in the interface's accent colour (.streamlit/config.toml).
+SELECTED_CARD_CSS = """<style>
+.st-key-style_card_{style} {{
+  border-color: #4F46E5 !important; box-shadow: 0 0 0 1px #4F46E5; background: #F7F7FF;
+}}
 </style>"""
 LOGO_SIDE = 1200   # pixels; plenty for a logo in a corner, even on a large screen
 

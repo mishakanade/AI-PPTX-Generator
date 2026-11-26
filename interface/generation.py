@@ -78,7 +78,8 @@ def review(deck, settings, conn):
 
 def write_deck(prompt, num_slides, topic, settings, conn):
     """Ask the AI API for the slides and store them, with a status box. Returns True on success."""
-    with st.status(tr("status_writing", provider=conn.name), expanded=False) as status:
+    box = st.empty()                    # the progress box disappears once the slides are there
+    with box.status(tr("status_writing", provider=conn.name), expanded=False) as status:
         try:
             deck = llm.generate_deck(prompt, max_slides=num_slides, api_key=conn.ai_key,
                                      provider=conn.provider, model=conn.ai_model)
@@ -87,34 +88,42 @@ def write_deck(prompt, num_slides, topic, settings, conn):
                 deck = review(deck, settings, conn)
             status.update(label=tr("status_photos"))
             store_deck(deck, topic, settings, conn)
-            status.update(label=tr("status_done"), state="complete")
-            return True
+            failure = None
         except Exception as e:
             status.update(label=tr("status_failed"), state="error")
-            show_error(e, conn)
-            return False
+            failure = e
+    if failure is not None:
+        show_error(failure, conn)       # outside the folded box, so that the advice is seen
+        return False
+    box.empty()
+    st.toast(tr("status_done"), icon="✅")
+    return True
 
 
 def read_long_document(doc_text, topic, conn):
     """A document too long for one request is read part by part; the presentation is then
     written from the digest of all parts instead of from the first pages only."""
-    with st.status(tr("status_digest", number=1, total="…"), expanded=False) as status:
+    box = st.empty()
+    with box.status(tr("status_digest", number=1, total="…"), expanded=False) as status:
         try:
             digest, used, total = llm.digest_document(
                 doc_text, topic, api_key=conn.ai_key, provider=conn.provider, model=conn.ai_model,
                 progress=lambda number, count: status.update(label=tr("status_digest", number=number, total=count)),
             )
+            failure = None
         except Exception as e:
             status.update(label=tr("status_failed"), state="error")
-            show_error(e, conn)
-            return None
-        status.update(label=tr("status_done"), state="complete")
+            failure = e
+    if failure is not None:
+        show_error(failure, conn)
+        return None
+    box.empty()
     st.info(tr("doc_digested", parts=used) if used == total else tr("doc_digested_partly", parts=used, total=total))
     return digest
 
 
-# After "Generate" the answer (a warning, the progress, the result) appears below the design
-# section, often out of sight. This scrolls to it; and on a phone, where the sidebar lies over
+# After "Generate" the answer (a warning, the progress, the result) may be out of sight, for
+# example after scrolling down the page. This scrolls to it; and on a phone, where the sidebar lies over
 # the page, it first closes the sidebar. On a computer, where the sidebar sits beside the page,
 # the sidebar stays as it is.
 SHOW_THE_ANSWER = """<script>
@@ -167,14 +176,19 @@ def handle_submit(form, conn):
         if conn.is_chat:
             st.session_state["chat_request"] = {"kind": "outline", "prompt": outline_prompt, **plan_request}
             return
-        with st.status(tr("status_planning", provider=conn.name), expanded=False) as status:
+        box = st.empty()
+        with box.status(tr("status_planning", provider=conn.name), expanded=False) as status:
             try:
-                show_outline(llm.generate_outline(outline_prompt, api_key=conn.ai_key, provider=conn.provider,
-                                                  model=conn.ai_model), plan_request)
-                status.update(label=tr("status_plan_done"), state="complete")
+                outline, failure = llm.generate_outline(outline_prompt, api_key=conn.ai_key,
+                                                        provider=conn.provider, model=conn.ai_model), None
             except Exception as e:
                 status.update(label=tr("status_failed"), state="error")
-                show_error(e, conn)
+                failure = e
+        if failure is not None:
+            show_error(failure, conn)
+            return
+        box.empty()
+        show_outline(outline, plan_request)
         return
 
     prompt = build_prompt(topic=form.topic, doc_text=doc_text, tone=form.tone, text_amount=form.text_amount,

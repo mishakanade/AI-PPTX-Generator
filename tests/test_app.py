@@ -488,8 +488,9 @@ def test_the_editors_pass_runs_after_writing_unless_switched_off(fakes):
 
 def test_quality_section_lists_problems_and_fixes_them_with_ai(fakes, monkeypatch):
     app = generated_app(fakes)
-    quality = [e for e in app.expander if "Quality check" in e.label]
-    assert quality and "/100" in quality[0].label
+    assert [t.label for t in app.tabs][:3] == ["🖼️ Slides", "🎨 Design", "🩺 Quality"]
+    quality = [m.value for m in app.markdown if "Quality check" in m.value]
+    assert quality and "/100" in quality[0]
 
     better = app.session_state["deck"].model_copy(deep=True)
     better.slides[0].title = "Новый заголовок-тезис для первого слайда"

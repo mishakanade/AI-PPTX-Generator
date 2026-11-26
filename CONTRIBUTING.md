@@ -15,7 +15,8 @@ ruff check .
 
 No API key is needed for any of this: every test replaces the AI and Unsplash with fakes.
 To try the app itself, start it with `python -m streamlit run app.py` and choose
-**Any AI chat (copy & paste)** in the sidebar if you have no key.
+**Any AI chat (copy & paste)** in the sidebar if you have no key. To work on the interface,
+`python -m streamlit run tools/ui_demo.py` runs it with a pretend AI: every screen in seconds.
 
 ## Before you open a pull request
 

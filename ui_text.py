@@ -27,7 +27,7 @@ TEXTS = {
                           "to paste into ChatGPT, Claude, Gemini or any other AI chat.",
 
         # keys
-        "keys_header": "🔑 API keys",
+        "keys_header": "🔑 API keys and model",
         "gemini_key": "Gemini API key",
         "openai_key": "OpenAI API key",
         "claude_key": "Anthropic API key",
@@ -38,17 +38,19 @@ TEXTS = {
         "key_get": "Get one at {url}",
         "keys_note": "Keys typed here stay only in this browser session and are not saved.",
         "need_ai_key": (
-            "🔑 **A {provider} API key is needed to generate presentations.** Get one at {url} "
-            "and paste it into **API keys** in the sidebar, or put it into `{env}` in the `.env` file "
-            "and restart the app. Or choose **Any AI chat (copy & paste)** to work without a key."
+            "🔑 **A {provider} API key is needed:** add it under **API keys and model** in the sidebar "
+            "(get one at {url}). "
+            "No key? Choose **Any AI chat (copy & paste)** as the AI."
         ),
         "no_unsplash_key": (
             "🖼️ No Unsplash key, so presentations will be generated without photos. "
-            "Add one (https://unsplash.com/developers) under **API keys** in the sidebar or in `.env`."
+            "Add one (https://unsplash.com/developers) under **API keys and model** in the sidebar or in `.env`."
         ),
 
         # content form
         "content": "Content",
+        "more_settings": "⚙️ More settings",
+        "more_settings_caption": "Audience, talk length, your data for charts, tone, amount of text, wishes.",
         "topic": "Presentation topic",
         "topic_placeholder": "The History of Space Exploration",
         "document": "Source document (optional)",
@@ -80,6 +82,13 @@ TEXTS = {
 
         # design
         "design": "Design",
+        "tab_slides": "🖼️ Slides",
+        "tab_design": "🎨 Design",
+        "tab_quality": "🩺 Quality",
+        "tab_edit": "✏️ Edit",
+        "tab_photos": "📷 Photos",
+        "tab_notes": "🎤 Notes",
+        "design_preview": "How it looks now",
         "colour_theme": "Colour theme",
         "custom_colours": "✏️ Custom colours",
         "colour_bg": "Slide",
@@ -112,18 +121,17 @@ TEXTS = {
         "status_digest": "Reading the long document: part {number} of {total}…",
         "doc_digested": "📚 The whole document was read in {parts} parts and the presentation was built from their digest.",
         "doc_digested_partly": "📚 The document was read in {parts} parts (of {total}); the rest was too long to include.",
-        "add_key_first": "⚠️ Add a {provider} API key under **API keys** in the sidebar first.",
+        "add_key_first": "⚠️ Add a {provider} API key under **API keys and model** in the sidebar first.",
         "need_topic": "⚠️ Please enter a topic or upload a document!",
         "status_writing": "Writing the content with {provider}…",
         "status_photos": "Looking for photos on Unsplash…",
         "status_planning": "Planning the presentation with {provider}…",
-        "status_plan_done": "The plan is ready",
         "status_done": "Content is ready",
         "status_failed": "Generation failed",
         "error": "❌ An error occurred: {error}",
         "error_details": "Technical details",
         "err_bad_key": "🔑 {provider} did not accept the API key. Check that it was copied completely, without "
-                       "spaces, and that it is still active, or paste another one under **API keys** in the sidebar.",
+                       "spaces, and that it is still active, or paste another one under **API keys and model** in the sidebar.",
         "err_quota": "💳 The {provider} account has no credit or quota left. Top up the balance or check the plan "
                      "in your {provider} account, or choose another AI in the sidebar.",
         "err_rate_limit": "⏳ {provider} reports too many requests right now, or this period's quota is used up. "
@@ -145,7 +153,7 @@ TEXTS = {
 
         # result
         "result_caption": "{count} slides · {style} style · {theme}. "
-                          "Pick another style or theme above to redraw it with the same content.",
+                          "In the Design tab another style or theme redraws it with the same content.",
         "theme_named": "{name} theme",
         "theme_custom": "custom colours",
         "download": "📥 Download .pptx",
@@ -241,11 +249,11 @@ TEXTS = {
         "pdf_working": "LibreOffice is making the PDF…",
         "pdf_error": "❌ The PDF could not be made: {error}",
         "open_project": "📂 Open a saved project",
+        "open_project_file": "Project file (.project.json)",
         "open_project_help": "A project saved here, or an AI chat's JSON answer saved as a file.",
         "project_error": "❌ Could not open this file: {error}",
 
         # photos
-        "photos_header": "🖼️ Photos",
         "photos_caption": "Swap a slide's photo for another one from Unsplash, upload your own picture, or remove it.",
         "another_photo": "🔄 Another",
         "upload_photo": "Your own picture",
@@ -279,7 +287,7 @@ TEXTS = {
         "chat_mode_info": "💬 Ключ API не нужен: после нажатия «Создать» приложение выдаст запрос, "
                           "который нужно вставить в ChatGPT, Claude, Gemini или любой другой ИИ-чат.",
 
-        "keys_header": "🔑 API-ключи",
+        "keys_header": "🔑 API-ключи и модель",
         "gemini_key": "Ключ Gemini API",
         "openai_key": "Ключ OpenAI API",
         "claude_key": "Ключ Anthropic API",
@@ -290,16 +298,18 @@ TEXTS = {
         "key_get": "Получить: {url}",
         "keys_note": "Введённые здесь ключи живут только в этой сессии браузера и нигде не сохраняются.",
         "need_ai_key": (
-            "🔑 **Для генерации нужен ключ {provider} API.** Получите его на {url} и вставьте в "
-            "**API-ключи** на боковой панели или впишите в `{env}` в файле `.env` и перезапустите "
-            "приложение. Или выберите **Любой ИИ-чат (копировать и вставить)** — тогда ключ не нужен."
+            "🔑 **Нужен ключ {provider} API:** добавьте его в **API-ключи и модель** на боковой панели "
+            "(получить: {url}). "
+            "Нет ключа? Выберите ИИ **Любой ИИ-чат (копировать и вставить)**."
         ),
         "no_unsplash_key": (
             "🖼️ Нет ключа Unsplash, поэтому презентации будут без фотографий. "
-            "Добавьте его (https://unsplash.com/developers) в **API-ключи** на боковой панели или в `.env`."
+            "Добавьте его (https://unsplash.com/developers) в **API-ключи и модель** на боковой панели или в `.env`."
         ),
 
         "content": "Содержание",
+        "more_settings": "⚙️ Ещё настройки",
+        "more_settings_caption": "Аудитория, длительность, ваши данные для диаграмм, тон, объём текста, пожелания.",
         "topic": "Тема презентации",
         "topic_placeholder": "История освоения космоса",
         "document": "Документ-источник (необязательно)",
@@ -330,6 +340,13 @@ TEXTS = {
         "design_hint": "Оформление (стиль, цвета, логотип) можно менять когда угодно, даже после генерации.",
 
         "design": "Оформление",
+        "tab_slides": "🖼️ Слайды",
+        "tab_design": "🎨 Оформление",
+        "tab_quality": "🩺 Качество",
+        "tab_edit": "✏️ Правка",
+        "tab_photos": "📷 Фото",
+        "tab_notes": "🎤 Заметки",
+        "design_preview": "Как это выглядит сейчас",
         "colour_theme": "Цветовая палитра",
         "custom_colours": "✏️ Свои цвета",
         "colour_bg": "Фон",
@@ -361,18 +378,17 @@ TEXTS = {
         "status_digest": "Читаю длинный документ: часть {number} из {total}…",
         "doc_digested": "📚 Документ прочитан целиком, по частям ({parts}); презентация построена по их конспекту.",
         "doc_digested_partly": "📚 Документ прочитан по частям: {parts} из {total}; остальное не вошло из-за объёма.",
-        "add_key_first": "⚠️ Сначала добавьте ключ {provider} API в **API-ключи** на боковой панели.",
+        "add_key_first": "⚠️ Сначала добавьте ключ {provider} API в **API-ключи и модель** на боковой панели.",
         "need_topic": "⚠️ Введите тему или загрузите документ!",
         "status_writing": "{provider} пишет содержание…",
         "status_photos": "Ищу фотографии на Unsplash…",
         "status_planning": "{provider} составляет план…",
-        "status_plan_done": "План готов",
         "status_done": "Содержание готово",
         "status_failed": "Генерация не удалась",
         "error": "❌ Произошла ошибка: {error}",
         "error_details": "Технические подробности",
         "err_bad_key": "🔑 {provider} не принял API-ключ. Проверьте, что он скопирован целиком, без пробелов, и всё ещё "
-                       "действует, или вставьте другой в **API-ключи** на боковой панели.",
+                       "действует, или вставьте другой в **API-ключи и модель** на боковой панели.",
         "err_quota": "💳 На аккаунте {provider} закончились деньги или квота. Пополните баланс или проверьте тариф "
                      "в личном кабинете {provider}, либо выберите другой ИИ на боковой панели.",
         "err_rate_limit": "⏳ {provider} сообщает о слишком большом числе запросов или об исчерпанной квоте на этот "
@@ -393,7 +409,7 @@ TEXTS = {
         ),
 
         "result_caption": "Слайдов: {count} · стиль {style} · {theme}. "
-                          "Выберите другой стиль или палитру выше, и презентация перерисуется с тем же текстом.",
+                          "Во вкладке «Оформление» можно сменить стиль и палитру: текст останется тем же.",
         "theme_named": "палитра {name}",
         "theme_custom": "свои цвета",
         "download": "📥 Скачать .pptx",
@@ -483,10 +499,10 @@ TEXTS = {
         "pdf_working": "LibreOffice делает PDF…",
         "pdf_error": "❌ Не удалось сделать PDF: {error}",
         "open_project": "📂 Открыть сохранённый проект",
+        "open_project_file": "Файл проекта (.project.json)",
         "open_project_help": "Проект, сохранённый здесь, или JSON-ответ ИИ-чата, сохранённый в файл.",
         "project_error": "❌ Не удалось открыть файл: {error}",
 
-        "photos_header": "🖼️ Фотографии",
         "photos_caption": "Замените фото на слайде другим с Unsplash, загрузите свою картинку или уберите фото.",
         "another_photo": "🔄 Другое",
         "upload_photo": "Своя картинка",

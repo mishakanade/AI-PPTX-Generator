@@ -76,11 +76,9 @@ def connection():
 
     with st.sidebar:
         typed_ai_key, ai_model = "", None
-        if info:
-            ai_model = st.text_input(tr("model"), key=f"model_{provider}", placeholder=DEFAULT_MODELS[provider],
-                                     help=tr("model_help")).strip() or None
-        else:
+        if not info:
             st.caption(tr("chat_mode_info"))
+        # keys and model in one folded group: open by itself only while the AI key is missing
         with st.expander(tr("keys_header"), expanded=bool(info) and not server_ai_key):
             if info:
                 typed_ai_key = st.text_input(
@@ -94,6 +92,9 @@ def connection():
                 help=tr("key_get", url="https://unsplash.com/developers"),
             ).strip()
             st.caption(tr("keys_note"))
+            if info:
+                ai_model = st.text_input(tr("model"), key=f"model_{provider}", placeholder=DEFAULT_MODELS[provider],
+                                         help=tr("model_help")).strip() or None
 
     conn = Connection(provider=provider, ai_key=(typed_ai_key or server_ai_key) if info else None,
                       ai_model=ai_model, unsplash_key=typed_unsplash_key or server_unsplash_key)
@@ -110,36 +111,42 @@ def content_form():
     with st.sidebar:
         st.header(tr("content"))
         with st.form("generation_form"):
+            # what almost everyone sets
             topic = st.text_input(tr("topic"), placeholder=tr("topic_placeholder"), key="topic")
             uploaded_file = st.file_uploader(tr("document"), type=["txt", "pdf", "docx"], key="document")
-            data_file = st.file_uploader(tr("data_file"), type=["csv", "xlsx"], key="data_file",
-                                         help=tr("data_file_help"))
             goal = st.selectbox(
                 tr("goal"), options=list(GOALS), key="goal", help=tr("goal_help"),
                 format_func=lambda key: ui_text.pick(ui_text.GOALS, lang, key),
             )
-            audience = st.text_input(tr("audience"), placeholder=tr("audience_placeholder"), key="audience")
-            tone = st.selectbox(
-                tr("tone"), options=list(TONE_PRESETS.keys()), key="tone",
-                format_func=lambda key: ui_text.pick(ui_text.TONES, lang, key),
-            )
-            text_amount = st.selectbox(
-                tr("text_amount"), options=list(TEXT_AMOUNT_PRESETS.keys()), index=2, key="text_amount",
-                format_func=lambda key: ui_text.pick(ui_text.TEXT_AMOUNTS, lang, key),
-            )
-            commentary = st.text_input(tr("wishes"), placeholder=tr("wishes_placeholder"), key="wishes")
             num_slides = st.slider(tr("num_slides"), min_value=2, max_value=15, value=6, step=1, key="num_slides")
-            minutes = st.number_input(tr("minutes"), min_value=0, max_value=120, value=0, step=5, key="minutes",
-                                      help=tr("minutes_help"))
-            speaker_notes = st.checkbox(tr("speaker_notes"), value=True, help=tr("speaker_notes_help"),
-                                        key="speaker_notes")
-            outline_first = st.checkbox(tr("outline_first"), value=False, help=tr("outline_first_help"),
-                                        key="outline_first")
-            auto_review = st.checkbox(tr("auto_review"), value=True, help=tr("auto_review_help"), key="auto_review")
+            # the rest, folded so that the Generate button stays in sight
+            with st.expander(tr("more_settings")):
+                st.caption(tr("more_settings_caption"))
+                audience = st.text_input(tr("audience"), placeholder=tr("audience_placeholder"), key="audience")
+                minutes = st.number_input(tr("minutes"), min_value=0, max_value=120, value=0, step=5,
+                                          key="minutes", help=tr("minutes_help"))
+                data_file = st.file_uploader(tr("data_file"), type=["csv", "xlsx"], key="data_file",
+                                             help=tr("data_file_help"))
+                tone = st.selectbox(
+                    tr("tone"), options=list(TONE_PRESETS.keys()), key="tone",
+                    format_func=lambda key: ui_text.pick(ui_text.TONES, lang, key),
+                )
+                text_amount = st.selectbox(
+                    tr("text_amount"), options=list(TEXT_AMOUNT_PRESETS.keys()), index=2, key="text_amount",
+                    format_func=lambda key: ui_text.pick(ui_text.TEXT_AMOUNTS, lang, key),
+                )
+                commentary = st.text_input(tr("wishes"), placeholder=tr("wishes_placeholder"), key="wishes")
+                speaker_notes = st.checkbox(tr("speaker_notes"), value=True, help=tr("speaker_notes_help"),
+                                            key="speaker_notes")
+                outline_first = st.checkbox(tr("outline_first"), value=False, help=tr("outline_first_help"),
+                                            key="outline_first")
+                auto_review = st.checkbox(tr("auto_review"), value=True, help=tr("auto_review_help"),
+                                          key="auto_review")
             submitted = st.form_submit_button(tr("generate"), type="primary", width="stretch", key="generate")
         st.caption(tr("design_hint"))
-        st.file_uploader(tr("open_project"), type=["json"], key="project_file", on_change=open_project,
-                         help=tr("open_project_help"))
+        with st.expander(tr("open_project")):
+            st.file_uploader(tr("open_project_file"), type=["json"], key="project_file", on_change=open_project,
+                             help=tr("open_project_help"))
 
     error = st.session_state.pop("project_error", None)
     if error:
